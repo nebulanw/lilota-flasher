@@ -10,6 +10,12 @@ import {
   FlashSizeValues
 } from "esptool-js";
 
+async function sendSerialMessage(transport, message) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  await transport.write(data);
+}
+
 function ConnectionButton({ portRef }) {
   const handleConnect = async() => {
     const port = await navigator.serial.requestPort();
@@ -113,6 +119,48 @@ function FlashButton({ portRef, setProgressText }) {
   return <button onClick={handleFlashClick}>Flash</button>
 }
 
+function ConfigureWifiButton({ portRef }) {
+  const handleConfigureClick = async() => {
+    const ssid = "FredIotNetwork";
+    const pass = "12345678";
+    const ssidCommand = `config set wifi_ssid ${ssid}`;
+    const passCommand = `config set wifi_pass ${pass}`;
+
+    // TODO: don't do this
+    const port = portRef.current;
+    // transport is a webserial wrapper.
+    const transport = new Transport(port, true);
+    const terminal: IEspLoaderTerminal = {
+      clean() {},
+      writeLine(data) {},
+      write(data) {
+        if (data) return;
+      },
+    };
+    const loaderOptions: LoaderOptions = {
+      transport: transport,
+      baudrate: 115200,
+      terminal: terminal,
+      debugLogging: false,
+    };
+
+    const loader = new ESPLoader(loaderOptions);
+
+    // You MUST do this to start the session.
+    await loader.main();
+
+    await sendSerialMessage(transport, ssidCommand);
+    await sendSerialMessage(transport, passCommand);
+    await sendSerialMessage(transport, "reboot"); // TODO: use the proper `wifi` command.
+
+    // You MUST do this after you're done with the session.
+    transport.disconnect();
+  }
+  return <button onClick={handleConfigureClick}>Set Wi-Fi</button>
+}
+
+
+
 export default function App() {
   const portRef = useRef(null);
   const [chipNameText, setChipNameText] = useState("<unknown>");
@@ -124,6 +172,7 @@ export default function App() {
       <p>Your board is {chipNameText}</p>
       <p>my progress on install is {progressText}</p>
       <FlashButton portRef={portRef} setProgressText={setProgressText}></FlashButton>
+      <ConfigureWifiButton portRef={portRef}></ConfigureWifiButton>
     </>
   )
 }
