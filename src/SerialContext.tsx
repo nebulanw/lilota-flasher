@@ -12,10 +12,23 @@ import {
 
 const SerialContext = createContext(null);
 
+const decoder = new TextDecoder('utf-8');
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type SerialState =
+  | "disconnected" // nothing
+  | "connecting"   // user picked port + opening port
+  | "serial-ready" // raw serial port open, nothing on it
+  | "serial-reading" // raw serial monitor using stream
+  | "esptool"        // esptool's transport using stream
+  | "flashing"       // flashing (flashing)
+  | "handoff";      // esptool -> raw serial (???)
+
 export function SerialProvider({ children }) {
   const portRef = useRef<SerialPort>(null);
-  const transportRef = useRef<Transport>(null);
-  const loaderRef = useRef<ESPLoader>(null);
+  const transportRef = useRef<Transport | null>(null);
+  const loaderRef = useRef<ESPLoader | null>(null);
+  const stateRef = useRef<SerialState>("disconnected" as SerialState);
 
   const [isConnected, setIsConnected] = useState(false);
   const [boardModel, setBoardModel] = useState('Unknown');
@@ -27,6 +40,16 @@ export function SerialProvider({ children }) {
     writeLine(data) {},
     write(data) {},
   };
+
+  const resetToLilota = useCallback(async(port) => {
+    // go to POWERON_RESET + SPI_FAST_FLASH_BOOT mode
+    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    await sleep(100);
+    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+    await sleep(100);
+    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    await sleep(100);
+  }, []);
 
   const connect = useCallback(async() => {
     const port = await navigator.serial.requestPort();
@@ -47,7 +70,32 @@ export function SerialProvider({ children }) {
 
     // You MUST do this to start the session.
     const boardModelTmp = await loader.main();
+    stateRef.current = "esptool" as SerialState;
     setBoardModel(boardModelTmp);
+
+    await sleep(500);
+
+    await loader.after("hard_reset");
+
+    await sleep(500);
+    console.log(portRef.current?.readable?.locked);
+    await transport.disconnect();
+    console.log("got here");
+    await port.open({ baudRate: 115200 });
+    const reader = port.readable.getReader();
+    await sleep(500);
+    await resetToLilota(port);
+    // await reader.
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        reader.releaseLock();
+        break;
+      }
+      if (value) {
+        console.log(decoder.decode(value));
+      }
+    }
   }, []);
 
   const disconnect = useCallback(async() => {
@@ -93,7 +141,8 @@ export function SerialProvider({ children }) {
       flashProgress,
       connect,
       flashFirmware,
-      disconnect
+      disconnect,
+      stateRef
     }}>
       {children}
     </SerialContext.Provider>

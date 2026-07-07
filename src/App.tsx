@@ -22,11 +22,12 @@ function DisconnectButton() {
 }
 
 function BoardLabel() {
-  const { boardModel, flashProgress } = useSerial();
+  const { boardModel, flashProgress, stateRef } = useSerial();
   return (
     <>
       <p>Board: {boardModel}</p>
       <p>Flash progress: {flashProgress}</p>
+      <p>State: {stateRef.current}</p>
     </>
   )
 }
