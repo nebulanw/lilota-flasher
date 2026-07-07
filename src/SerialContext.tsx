@@ -50,6 +50,12 @@ export function SerialProvider({ children }) {
     setBoardModel(boardModelTmp);
   }, []);
 
+  const disconnect = useCallback(async() => {
+    const transport = transportRef.current;
+    transport?.disconnect();
+    transportRef.current = null; // I guess??? 
+  }, []);
+
   const flashFirmware = useCallback(async() => {
     const loader = loaderRef.current;
 
@@ -86,7 +92,8 @@ export function SerialProvider({ children }) {
       boardModel,
       flashProgress,
       connect,
-      flashFirmware
+      flashFirmware,
+      disconnect
     }}>
       {children}
     </SerialContext.Provider>

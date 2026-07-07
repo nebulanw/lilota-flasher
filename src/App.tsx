@@ -16,6 +16,11 @@ function ConnectButton() {
   return <button onClick={connect}>Connect</button>
 }
 
+function DisconnectButton() {
+  const { disconnect } = useSerial();
+  return <button onClick={disconnect}>Disconnect</button>
+}
+
 function BoardLabel() {
   const { boardModel, flashProgress } = useSerial();
   return (
@@ -31,6 +36,7 @@ export default function App() {
     <SerialProvider>
       <h2>Lilota tool :D</h2>
       <ConnectButton></ConnectButton>
+      <DisconnectButton></DisconnectButton>
       <FlashButton></FlashButton>
       <BoardLabel></BoardLabel>
     </SerialProvider>
