@@ -15,6 +15,7 @@ export type SerialContextValue = {
   flashProgress: string;
   state: SerialState;
   configureWifi: (ssid: string, password: string) => Promise<void>;
+  waitForLilotaPrompt: () => Promise<void>;
   connectPort: () => Promise<void>;
   disconnectPort: () => Promise<void>;
   startSerialMonitor: () => Promise<void>;

@@ -10,6 +10,7 @@ import {
 import { SerialState, SerialContext } from './SerialContext';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const LILOTA_PROMPT_REGEX = /[^\r\n]*:\/# $/;
 
 function tclBrace(value: string) {
   return `{${value.replaceAll("\\", "\\\\").replaceAll("}", "\\}")}}`;
@@ -24,6 +25,8 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   const terminalListenerRef = useRef(new Set<(chunk: string) => void>());
   const terminalBufferRef = useRef("");
   const monitorTaskRef = useRef<Promise<void> | null>(null);
+  const latestTerminalLineRef = useRef("");
+  const promptWaitersRef = useRef(new Set<() => void>());
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
   const [boardModel, setBoardModel] = useState('Unknown');
@@ -44,9 +47,50 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       terminalBufferRef.current = terminalBufferRef.current.slice(-200_000);
     }
 
+    const combinedLine = latestTerminalLineRef.current + chunk;
+    const lastLineBreak = Math.max(
+      combinedLine.lastIndexOf("\r"),
+      combinedLine.lastIndexOf("\n")
+    );
+
+    latestTerminalLineRef.current =
+      lastLineBreak === -1 ? combinedLine : combinedLine.slice(lastLineBreak + 1);
+
+    if (LILOTA_PROMPT_REGEX.test(latestTerminalLineRef.current)) {
+      for (const resolve of promptWaitersRef.current) {
+        resolve();
+      }
+
+      promptWaitersRef.current.clear();
+    }
+
     for (const listener of terminalListenerRef.current) {
       listener(chunk);
     }
+  }, []);
+
+  const waitForLilotaPrompt = useCallback(async () => {
+    requireState("monitoring", "waitForLilotaPrompt");
+
+    if (LILOTA_PROMPT_REGEX.test(latestTerminalLineRef.current)) {
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let timeoutId: number;
+
+      const resolveWaiter = () => {
+        window.clearTimeout(timeoutId);
+        resolve();
+      };
+
+      timeoutId = window.setTimeout(() => {
+        promptWaitersRef.current.delete(resolveWaiter);
+        reject(new Error("Timed out waiting for Lilota prompt"));
+      }, 15_000);
+
+      promptWaitersRef.current.add(resolveWaiter);
+    })
   }, []);
 
   const subscribeTerminal = useCallback((listener: (chunk: string) => void) => {
@@ -350,6 +394,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       boardModel,
       flashProgress,
       configureWifi,
+      waitForLilotaPrompt,
       connectPort,
       disconnectPort,
       startSerialMonitor,
