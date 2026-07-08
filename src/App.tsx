@@ -12,22 +12,37 @@ function FlashButton() {
 }
 
 function ConnectButton() {
-  const { connect } = useSerial();
-  return <button onClick={connect}>Connect</button>
+  const { connectPort } = useSerial();
+  return <button onClick={connectPort}>Connect</button>
 }
 
 function DisconnectButton() {
-  const { disconnect } = useSerial();
-  return <button onClick={disconnect}>Disconnect</button>
+  const { disconnectPort } = useSerial();
+  return <button onClick={disconnectPort}>Disconnect</button>
+}
+
+function StartMonitorButton() {
+  const { startSerialMonitor } = useSerial();
+  return <button onClick={startSerialMonitor}>Start Monitoring</button>
+}
+
+function StopMonitorButton() {
+  const { stopSerialMonitor } = useSerial();
+  return <button onClick={stopSerialMonitor}>Stop Monitoring</button>
+}
+
+function ResetButton() {
+  const { resetToLilota } = useSerial();
+  return <button onClick={resetToLilota}>Reset</button>
 }
 
 function BoardLabel() {
-  const { boardModel, flashProgress, stateRef } = useSerial();
+  const { boardModel, flashProgress, state } = useSerial();
   return (
     <>
       <p>Board: {boardModel}</p>
       <p>Flash progress: {flashProgress}</p>
-      <p>State: {stateRef.current}</p>
+      <p>State: {state}</p>
     </>
   )
 }
@@ -39,6 +54,9 @@ export default function App() {
       <ConnectButton></ConnectButton>
       <DisconnectButton></DisconnectButton>
       <FlashButton></FlashButton>
+      <StartMonitorButton></StartMonitorButton>
+      <StopMonitorButton></StopMonitorButton>
+      <ResetButton></ResetButton>
       <BoardLabel></BoardLabel>
     </SerialProvider>
   )
