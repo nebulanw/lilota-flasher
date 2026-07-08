@@ -1,4 +1,5 @@
-import { SerialProvider, useSerial } from "./SerialContext";
+import { SerialProvider } from "./SerialProvider";
+import { useSerial } from "./useSerial";
 import { SerialTerminal } from "./SerialTerminal";
 
 // async function sendSerialMessage(transport, message) {
