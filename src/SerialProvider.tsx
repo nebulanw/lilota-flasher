@@ -10,7 +10,10 @@ import {
 import { SerialState, SerialContext } from './SerialContext';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const LILOTA_PROMPT_REGEX = /[^\r\n]*: \/# $/;
+
+function tclBrace(value: string) {
+  return `{${value.replaceAll("\\", "\\\\").replaceAll("}", "\\}")}}`;
+}
 
 export function SerialProvider({ children }: { children: React.ReactNode }) {
   const portRef = useRef<SerialPort>(null);
@@ -169,6 +172,22 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       writer.releaseLock();
     }
   }, []);
+
+  const sendLilotaCommand = useCallback(async (command: string) => {
+    for (let i = 0; i < command.length; i++) {
+      await writeSerial(command[i]);
+      await sleep(2);
+    }
+    await writeSerial("\r");
+    await sleep(250);
+  }, [writeSerial]);
+
+  const configureWifi = useCallback(async (ssid: string, password: string) => {
+    requireState("monitoring", "configureWifi");
+
+    await sendLilotaCommand(`config set wifi_ssid ${tclBrace(ssid)}`);
+    await sendLilotaCommand(`config set wifi_pass ${tclBrace(password)}`);
+  }, [sendLilotaCommand]);
 
   const stopSerialMonitor = useCallback(async () => {
     requireState("monitoring", "stopSerialMonitor");

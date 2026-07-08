@@ -1,6 +1,7 @@
 import { SerialProvider } from "./SerialProvider";
 import { useSerial } from "./useSerial";
 import { SerialTerminal } from "./SerialTerminal";
+import { WifiForm } from "./WifiForm";
 
 function FlashButton() {
   const { flashFirmware, state } = useSerial();
@@ -75,6 +76,7 @@ export default function App() {
       <StopMonitorButton></StopMonitorButton>
       <ResetButton></ResetButton>
       <BoardLabel></BoardLabel>
+      <WifiForm></WifiForm>
       <SerialTerminal />
     </SerialProvider>
   )
