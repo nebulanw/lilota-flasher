@@ -1,4 +1,5 @@
 import { SerialProvider, useSerial } from "./SerialContext";
+import { SerialTerminal } from "./SerialTerminal";
 
 // async function sendSerialMessage(transport, message) {
 //   const encoder = new TextEncoder();
@@ -58,6 +59,7 @@ export default function App() {
       <StopMonitorButton></StopMonitorButton>
       <ResetButton></ResetButton>
       <BoardLabel></BoardLabel>
+      <SerialTerminal />
     </SerialProvider>
   )
 }

@@ -30,16 +30,13 @@ export function SerialProvider({ children }) {
   const loaderRef = useRef<ESPLoader | null>(null);
   const stateRef = useRef<SerialState>("disconnected");
   const readerRef = useRef<ReadableStreamDefaultReader>(null);
+  const terminalListenerRef = useRef(new Set<(chunk: string) => void>());
+  const terminalBufferRef = useRef("");
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
   const [isConnected, setIsConnected] = useState(false);
   const [boardModel, setBoardModel] = useState('Unknown');
   const [flashProgress, setFlashProgress] = useState('--%');
-
-  const setState = useCallback((next: SerialState) => {
-    stateRef.current = next;
-    _setState(next);
-  }, []);
 
   function requireState(allowed: SerialState | SerialState[], action: string) {
     const list = Array.isArray(allowed) ? allowed: [allowed];
@@ -48,12 +45,48 @@ export function SerialProvider({ children }) {
     }
   }
 
-  // TODO: implement terminal handlers.
-  const terminal: IEspLoaderTerminal = {
-    clean() {},
-    writeLine(data) {},
-    write(data) {},
-  };
+  const appendTerminal = useCallback((chunk: string) => {
+    terminalBufferRef.current += chunk;
+
+    // keep the replay buffer from growing forever
+    if (terminalBufferRef.current.length > 200_000) {
+      terminalBufferRef.current = terminalBufferRef.current.slice(-200_000);
+    }
+
+    for (const listener of terminalListenerRef.current) {
+      listener(chunk);
+    }
+  }, []);
+
+  const subscribeTerminal = useCallback((listener: (chunk: string) => void) => {
+    terminalListenerRef.current.add(listener);
+    return () => {
+      terminalListenerRef.current.delete(listener);
+    };
+  }, []);
+
+  const getTerminalBuffer = useCallback(() => {
+    return terminalBufferRef.current;
+  }, []);
+
+  const clearTerminalBuffer = useCallback(() => {
+    terminalBufferRef.current = "";
+    appendTerminal("\x1bc");
+  }, []);
+
+  const terminalInfo = useCallback((message: string) => {
+    appendTerminal(`\r\n[system] ${message}\r\n`);
+  }, [appendTerminal]);
+
+  const setState = useCallback((next: SerialState) => {
+    const prev = stateRef.current;
+    stateRef.current = next;
+    _setState(next);
+
+    if (prev !== next) {
+      terminalInfo(`${prev} -> ${next}`);
+    }
+  }, [terminalInfo]);
 
   const resetToLilota = useCallback(async() => {
     const port = portRef.current;
@@ -104,7 +137,8 @@ export function SerialProvider({ children }) {
 
         const text = decoder.decode(value, { stream: true });
         // TODO: better logger
-        console.log(text);
+        // console.log(text);
+        appendTerminal(text);
       }
     } finally {
       reader.releaseLock();
@@ -113,6 +147,24 @@ export function SerialProvider({ children }) {
       if (stateRef.current === "monitoring") {
         setState("ready");
       }
+    }
+  }, [appendTerminal, setState]);
+
+  const writeSerial = useCallback(async (data: string) => {
+    requireState("monitoring", "writeSerial");
+
+    const port = portRef.current;
+    if (!port?.writable) {
+      throw new Error("Port is not writeable");
+    }
+
+    const writer = port.writable.getWriter();
+
+    try {
+      const encoded = new TextEncoder().encode(data);
+      await writer.write(encoded);
+    } finally {
+      writer.releaseLock();
     }
   }, []);
 
@@ -184,12 +236,14 @@ export function SerialProvider({ children }) {
         transport,
         baudrate: 115200,
         terminal: {
-          clean() {},
+          clean() {
+            appendTerminal("\r\n[esptool] ------------------------------\r\n");
+          },
           writeLine(text: string) {
-            console.log(text);
+            appendTerminal(`[esptool] ${text}\r\n`);
           },
           write(text: string) {
-            console.log(text);
+            appendTerminal(text);
           },
         },
       });
@@ -286,6 +340,10 @@ export function SerialProvider({ children }) {
       stopSerialMonitor,
       flashFirmware: flashLilota,
       resetToLilota,
+      subscribeTerminal,
+      getTerminalBuffer,
+      clearTerminalBuffer,
+      writeSerial,
       state
     }}>
       {children}
