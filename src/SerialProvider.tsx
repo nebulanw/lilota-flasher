@@ -10,6 +10,7 @@ import {
 import { SerialState, SerialContext } from './SerialContext';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const LILOTA_PROMPT_REGEX = /[^\r\n]*: \/# $/;
 
 export function SerialProvider({ children }: { children: React.ReactNode }) {
   const portRef = useRef<SerialPort>(null);
@@ -19,6 +20,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   const readerRef = useRef<ReadableStreamDefaultReader>(null);
   const terminalListenerRef = useRef(new Set<(chunk: string) => void>());
   const terminalBufferRef = useRef("");
+  const monitorTaskRef = useRef<Promise<void> | null>(null);
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
   const [boardModel, setBoardModel] = useState('Unknown');
@@ -75,8 +77,12 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   }, [terminalInfo]);
 
   const resetToLilota = useCallback(async() => {
+    requireState(["ready", "monitoring"], "resetToLilota");
+
     const port = portRef.current;
-    if (!port) return;
+    if (!port) {
+      throw new Error("No port connected");
+    }
     // go to POWERON_RESET + SPI_FAST_FLASH_BOOT mode
     await port.setSignals({ dataTerminalReady: false, requestToSend: false });
     await sleep(100);
@@ -115,25 +121,35 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     const decoder = new TextDecoder();
     setState("monitoring");
 
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (!value) continue;
+    const monitorTask = (async () => {
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (!value) continue;
 
-        const text = decoder.decode(value, { stream: true });
-        // TODO: better logger
-        // console.log(text);
-        appendTerminal(text);
-      }
-    } finally {
-      reader.releaseLock();
-      readerRef.current = null;
+          const text = decoder.decode(value, { stream: true });
 
-      if (stateRef.current === "monitoring") {
-        setState("ready");
+          appendTerminal(text);
+        }
+      } finally {
+        reader.releaseLock();
+        readerRef.current = null;
+        monitorTaskRef.current = null;
+
+        if (stateRef.current === "monitoring") {
+          setState("ready");
+        }
       }
-    }
+    })();
+
+    monitorTaskRef.current = monitorTask;
+
+    monitorTask.catch((error) => {
+      appendTerminal(`\r\n[system] Serial monitor failed: ${
+        error instanceof Error ? error.message : String(error)
+      }\r\n`)
+    })
   }, [appendTerminal, setState]);
 
   const writeSerial = useCallback(async (data: string) => {
@@ -158,6 +174,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     requireState("monitoring", "stopSerialMonitor");
 
     await readerRef.current?.cancel();
+    await monitorTaskRef.current;
   }, []);
 
   const disconnectPort = useCallback(async() => {
@@ -194,6 +211,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     try {
       if (previousState === "monitoring") {
         await readerRef.current?.cancel();
+        await monitorTaskRef.current;
       }
 
       await port.close();
@@ -265,7 +283,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         compress: true,
         reportProgress: (_, written, total) => {
           const percent = (written / total) * 100;
-          setFlashProgress(`${percent}%`);
+          setFlashProgress(`${percent.toFixed(1)}%`);
         }
       }
 
@@ -300,6 +318,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         setState("ready");
       } catch (error) {
         console.warn("Failed to reopen serial port after flash fail", error);
+        portRef.current = null;
         setState("disconnected");
       }
 
@@ -311,6 +330,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     <SerialContext.Provider value={{
       boardModel,
       flashProgress,
+      configureWifi,
       connectPort,
       disconnectPort,
       startSerialMonitor,

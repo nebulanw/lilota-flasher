@@ -3,33 +3,54 @@ import { useSerial } from "./useSerial";
 import { SerialTerminal } from "./SerialTerminal";
 
 function FlashButton() {
-  const { flashFirmware } = useSerial();
-  return <button onClick={flashFirmware}>Flash</button>
+  const { flashFirmware, state } = useSerial();
+  const disabled = state !== "ready" && state !== "monitoring";
+  return <button disabled={disabled} onClick={flashFirmware}>Flash</button>
 }
 
 function ConnectButton() {
-  const { connectPort } = useSerial();
-  return <button onClick={connectPort}>Connect</button>
+  const { connectPort, state } = useSerial();
+  const disabled = state !== "disconnected";
+  return <button disabled={disabled} onClick={connectPort}>Connect</button>
 }
 
 function DisconnectButton() {
-  const { disconnectPort } = useSerial();
-  return <button onClick={disconnectPort}>Disconnect</button>
+  const { disconnectPort, state } = useSerial();
+  const disabled = state !== "ready" && state !== "monitoring";
+  return <button disabled={disabled} onClick={disconnectPort}>Disconnect</button>
 }
 
 function StartMonitorButton() {
-  const { startSerialMonitor } = useSerial();
-  return <button onClick={startSerialMonitor}>Start Monitoring</button>
+  const { startSerialMonitor, state } = useSerial();
+  const disabled = state !== "ready";
+
+  return (
+    <button disabled={disabled} onClick={startSerialMonitor}>
+      Start Monitoring
+    </button>
+  );
 }
 
 function StopMonitorButton() {
-  const { stopSerialMonitor } = useSerial();
-  return <button onClick={stopSerialMonitor}>Stop Monitoring</button>
+  const { stopSerialMonitor, state } = useSerial();
+  const disabled = state !== "monitoring";
+
+  return (
+    <button disabled={disabled} onClick={stopSerialMonitor}>
+      Stop Monitoring
+    </button>
+  );
 }
 
 function ResetButton() {
-  const { resetToLilota } = useSerial();
-  return <button onClick={resetToLilota}>Reset</button>
+  const { resetToLilota, state } = useSerial();
+  const disabled = state !== "ready" && state !== "monitoring";
+
+  return (
+    <button disabled={disabled} onClick={resetToLilota}>
+      Reset
+    </button>
+  );
 }
 
 function BoardLabel() {

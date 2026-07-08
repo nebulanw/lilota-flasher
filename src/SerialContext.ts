@@ -14,6 +14,7 @@ export type SerialContextValue = {
   boardModel: string;
   flashProgress: string;
   state: SerialState;
+  configureWifi: (ssid: string, password: string) => Promise<void>;
   connectPort: () => Promise<void>;
   disconnectPort: () => Promise<void>;
   startSerialMonitor: () => Promise<void>;
