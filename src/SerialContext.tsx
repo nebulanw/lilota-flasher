@@ -255,7 +255,7 @@ export function SerialProvider({ children }) {
 
       setState("flashing");
 
-      const firmwareResponse = await fetch("/lilota/merged-firmware.bin");
+      const firmwareResponse = await fetch("/lilota/lilota-webflash.bin");
       const firmware = new Uint8Array(await firmwareResponse.arrayBuffer());
 
       const flashOptions: FlashOptions = {
