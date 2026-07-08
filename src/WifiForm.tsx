@@ -9,7 +9,7 @@ export function WifiForm() {
     const [isConfiguring, setIsConfiguring] = useState(false);
     const [isFlashing, setIsFlashing] = useState(false);
 
-    const hasSsid = ssid.trim().length > 0;
+    const hasSsid = ssid.trim().length >= 0;
     const canConfigure = state === "monitoring" && hasSsid && !isConfiguring && !isFlashing;
     const canFlash = 
         (state === "ready" || state === "monitoring") &&
