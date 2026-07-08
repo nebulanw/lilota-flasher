@@ -2,12 +2,6 @@ import { SerialProvider } from "./SerialProvider";
 import { useSerial } from "./useSerial";
 import { SerialTerminal } from "./SerialTerminal";
 
-// async function sendSerialMessage(transport, message) {
-//   const encoder = new TextEncoder();
-//   const data = encoder.encode(message);
-//   await transport.write(data);
-// }
-
 function FlashButton() {
   const { flashFirmware } = useSerial();
   return <button onClick={flashFirmware}>Flash</button>

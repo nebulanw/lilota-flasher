@@ -11,6 +11,12 @@ export function SerialTerminal() {
 
     const { state, subscribeTerminal, getTerminalBuffer, writeSerial } = useSerial();
 
+    const stateRef = useRef(state);
+    
+    useEffect(() => {
+        stateRef.current = state;
+    }, [state]);
+
     useEffect(() => {
         if (!containerRef.current) return;
 
@@ -48,7 +54,7 @@ export function SerialTerminal() {
         resizeObserver.observe(containerRef.current);
 
         const disposable = term.onData((data) => {
-            if (state === "monitoring") {
+            if (stateRef.current === "monitoring") {
                 void writeSerial(data);
             }
         });
@@ -61,6 +67,6 @@ export function SerialTerminal() {
             termRef.current = null;
             fitAddonRef.current = null;
         };
-    }, [getTerminalBuffer, subscribeTerminal, state, writeSerial]);
+    }, [getTerminalBuffer, subscribeTerminal, writeSerial]);
     return <div ref={containerRef}/>;
 }

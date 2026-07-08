@@ -286,12 +286,20 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       await resetToLilota();
       await startSerialMonitor();
     } catch (err) {
+      try {
+        await transportRef.current?.disconnect();
+      } catch (error) {
+        console.warn("Failed to disconnect transport during cleanup", error);
+      }
+
       transportRef.current = null;
       loaderRef.current = null;
 
-      if (portRef.current) {
+      try {
+        await port.open({ baudRate: 115200 });
         setState("ready");
-      } else {
+      } catch (error) {
+        console.warn("Failed to reopen serial port after flash fail", error);
         setState("disconnected");
       }
 
