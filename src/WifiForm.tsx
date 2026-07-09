@@ -1,5 +1,9 @@
 import { useState, type ComponentProps } from "react";
 import { useSerial } from "./useSerial";
+import { Button } from "./components/ui/button";
+import { Checkbox } from "./components/ui/checkbox";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
 
 export function WifiForm() {
     const { configureWifi, flashFirmware, waitForLilotaPrompt, state } = useSerial();
@@ -50,44 +54,50 @@ export function WifiForm() {
 
     return (
         <form onSubmit={handleSubmit}>
-            <label>
-                SSID
-                <input 
+            <div className="space-y-2">
+                <Label htmlFor="wifi-ssid">SSID</Label>
+                <Input 
+                    id="wifi-ssid"
                     value={ssid}
                     onChange={(event) => setSsid(event.currentTarget.value)}
                     disabled={isConfiguring || isFlashing}
                 />
-            </label>
-            <label>
-                Password
-                <input
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="wifi-password">Password</Label>
+                <Input
+                    id="wifi-password"
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.currentTarget.value)}
                     disabled={isConfiguring || isFlashing}
                 />
-            </label>
-            <label>
-                <input
-                    type="checkbox"
+            </div>
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id="configure-after-flash"
                     checked={configureAfterFlash}
-                    onChange={(event) => setConfigureAfterFlash(event.currentTarget.checked)}
+                    onCheckedChange={(checked) => setConfigureAfterFlash(checked === true)}
                     disabled={isConfiguring || isFlashing}
                 />
-                Configure Wi-Fi after flashing
-            </label>
-            <button disabled={!canConfigure} type="submit">
-                {isConfiguring ? "Configuring..." : "Configure Wi-Fi"}
-            </button>
-            <button disabled={!canFlash} type="button" onClick={handleFlashClick}>
-                {isFlashing
-                    ? configureAfterFlash
-                        ? "Flashing & configuring..."
-                        : "Flashing..."
-                    : configureAfterFlash
-                        ? "Flash & Configure Wi-Fi"
-                        : "Flash Lilota"}
-            </button>
+                <Label htmlFor="configure-after-flash">
+                    Configure Wi-Fi after flashing
+                </Label>
+            </div>
+            <div className="flex gap-2">
+                <Button disabled={!canConfigure} type="submit">
+                    {isConfiguring ? "Configuring..." : "Configure Wi-Fi"}
+                </Button>
+                <Button disabled={!canFlash} type="button" onClick={handleFlashClick}>
+                    {isFlashing
+                        ? configureAfterFlash
+                            ? "Flashing & configuring..."
+                            : "Flashing..."
+                        : configureAfterFlash
+                            ? "Flash & Configure Wi-Fi"
+                            : "Flash Lilota"}
+                </Button>
+            </div>
         </form>
     );
 }
