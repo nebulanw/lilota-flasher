@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "./components/ui/label";
 import { Switch } from "./components/ui/switch";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { RiUsbLine, RiLinkUnlinkM, RiResetRightLine, RiPlayLine, RiStopLine } from "@remixicon/react";
+import { RiUsbLine, RiLinkUnlinkM, RiResetRightLine, RiPlayLine, RiStopLine, RiDeleteBinLine } from "@remixicon/react";
 
 
 function FlashProgressBar() {
@@ -66,6 +66,15 @@ function ToggleMonitorButton() {
          )}
     </Button>
   );
+}
+
+function ClearTerminalButton() {
+  return (
+    <Button>
+      <RiDeleteBinLine data-icon="inline-start" />
+      Clear
+    </Button>
+  )
 }
 
 function ResetButton() {
@@ -134,6 +143,7 @@ function TerminalCard() {
         <div className="please help flex gap-1">
           <ResetButton />
           <ToggleMonitorButton />
+          <ClearTerminalButton />
         </div>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
