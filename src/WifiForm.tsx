@@ -1,9 +1,9 @@
 import { useState, type ComponentProps } from "react";
 import { useSerial } from "./useSerial";
 import { Button } from "./components/ui/button";
-import { Checkbox } from "./components/ui/checkbox";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
+import { Switch } from "./components/ui/switch";
 import { RiDownload2Line } from "@remixicon/react";
 
 export function WifiForm() {
@@ -54,15 +54,15 @@ export function WifiForm() {
     }
 
     return (
-        <form onSubmit={handleSubmit}>
-                        <div className="flex items-center gap-2">
-                <Checkbox
-                    id="configure-after-flash"
+        <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+            <div className="flex items-center gap-2">
+                <Switch
+                    id="configure-wifi"
                     checked={configureAfterFlash}
                     onCheckedChange={(checked) => setConfigureAfterFlash(checked === true)}
                     disabled={isConfiguring || isFlashing}
                 />
-                <Label htmlFor="configure-after-flash">
+                <Label htmlFor="configure-wifi">
                     Configure a Wi-Fi network
                     <br/>(i) Lilota will create an Access Point otherwise.
                 </Label>

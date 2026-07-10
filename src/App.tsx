@@ -4,15 +4,16 @@ import { SerialTerminal } from "./SerialTerminal";
 import { WifiForm } from "./WifiForm";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "./components/ui/checkbox";
 import { Label } from "./components/ui/label";
+import { Switch } from "./components/ui/switch";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { RiUsbLine, RiLinkUnlinkM, RiResetRightLine } from "@remixicon/react";
+import { RiUsbLine, RiLinkUnlinkM, RiResetRightLine, RiPlayLine, RiStopLine } from "@remixicon/react";
+
 
 function FlashProgressBar() {
   const { flashProgress} = useSerial();
   return <Progress value={flashProgress} className="w-full max-w-sm">
-    <ProgressLabel>Upload progess</ProgressLabel>
+    <ProgressLabel>Upload Progess</ProgressLabel>
     <ProgressValue />
   </Progress>
 }
@@ -37,24 +38,32 @@ function DisconnectButton() {
   );
 }
 
-function StartMonitorButton() {
-  const { startSerialMonitor, state } = useSerial();
-  const disabled = state !== "ready";
+function ToggleMonitorButton() {
+  const { startSerialMonitor, stopSerialMonitor, state } = useSerial();
+  const disabled = state !== "ready" && state !== "monitoring";
+
+  const handleToggle = () => {
+    if (state === "monitoring") {
+      stopSerialMonitor();
+    } else {
+      startSerialMonitor();
+    }
+  }
 
   return (
-    <Button disabled={disabled} onClick={startSerialMonitor}>
-      Start Monitoring
-    </Button>
-  );
-}
-
-function StopMonitorButton() {
-  const { stopSerialMonitor, state } = useSerial();
-  const disabled = state !== "monitoring";
-
-  return (
-    <Button disabled={disabled} onClick={stopSerialMonitor}>
-      Stop Monitoring
+    <Button disabled={disabled} onClick={handleToggle}>
+      {state === "monitoring" ? (
+        <>
+          <RiStopLine data-icon="inline-start" />
+          Stop Monitoring
+        </>
+        )
+         : (
+          <>
+            <RiPlayLine data-icon="inline-start" />
+            Start Monitoring
+          </>
+         )}
     </Button>
   );
 }
@@ -81,7 +90,7 @@ function DeviceCard() {
             Connect your ESP32 by plugging it in to your computer using a USB cable.
             <br/>Make sure to use a good quality cable!
             <br/>
-          <div className="flex">
+          <div className="flex gap-1">
             <ConnectButton />
             <DisconnectButton />
           </div>
@@ -98,17 +107,17 @@ function FlashCard() {
       <CardHeader>
         <CardTitle>Flash</CardTitle>
       </CardHeader>
-      DROPDOWN MENU FOR FIRMWARE SELECTOR VIA GUTHIB API
+      <p>DROPDOWN MENU FOR FIRMWARE SELECTOR VIA GUTHIB API</p>
       <CardContent className="flex gap-3">
-                <Checkbox
-                    id="configure-after-flash"
-                />
-                <Label htmlFor="configure-after-flash">
-                    Erase existing flash
-                </Label>
+        <div className="flex items-start gap-2">
+          <Switch
+              id="erase-flash"
+          />
+          <Label htmlFor="erase-flash">
+              Erase existing flash
+          </Label>
+        </div>
         <WifiForm />
-        {/* <FlashButton /> */}
-        
       </CardContent>
       <FlashProgressBar></FlashProgressBar>
                   
@@ -122,10 +131,9 @@ function TerminalCard() {
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Terminal</CardTitle>
 
-        <div className="please help flex gap-2">
+        <div className="please help flex gap-1">
           <ResetButton />
-          <StartMonitorButton />
-          <StopMonitorButton />
+          <ToggleMonitorButton />
         </div>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
