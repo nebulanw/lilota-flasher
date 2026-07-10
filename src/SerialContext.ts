@@ -12,7 +12,7 @@ export type SerialState =
 
 export type SerialContextValue = {
   boardModel: string;
-  flashProgress: string;
+  flashProgress: number;
   state: SerialState;
   configureWifi: (ssid: string, password: string) => Promise<void>;
   waitForLilotaPrompt: () => Promise<void>;

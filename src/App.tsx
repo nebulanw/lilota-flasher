@@ -4,23 +4,37 @@ import { SerialTerminal } from "./SerialTerminal";
 import { WifiForm } from "./WifiForm";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "./components/ui/checkbox";
+import { Label } from "./components/ui/label";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
+import { RiUsbLine, RiLinkUnlinkM, RiResetRightLine } from "@remixicon/react";
 
-function FlashButton() {
-  const { flashFirmware, state } = useSerial();
-  const disabled = state !== "ready" && state !== "monitoring";
-  return <Button disabled={disabled} onClick={flashFirmware}>Flash</Button>
+function FlashProgressBar() {
+  const { flashProgress} = useSerial();
+  return <Progress value={flashProgress} className="w-full max-w-sm">
+    <ProgressLabel>Upload progess</ProgressLabel>
+    <ProgressValue />
+  </Progress>
 }
 
 function ConnectButton() {
   const { connectPort, state } = useSerial();
   const disabled = state !== "disconnected";
-  return <Button disabled={disabled} onClick={connectPort}>Connect</Button>
+  return (
+    <Button disabled={disabled} onClick={connectPort}>
+      <RiUsbLine data-icon="inline-start" /> Connect
+    </Button>
+  );
 }
 
 function DisconnectButton() {
   const { disconnectPort, state } = useSerial();
   const disabled = state !== "ready" && state !== "monitoring";
-  return <Button disabled={disabled} onClick={disconnectPort}>Disconnect</Button>
+  return (
+    <Button disabled={disabled} onClick={disconnectPort}>
+      <RiLinkUnlinkM data-icon="inline-start" />Disconnect
+    </Button>
+  );
 }
 
 function StartMonitorButton() {
@@ -51,36 +65,27 @@ function ResetButton() {
 
   return (
     <Button disabled={disabled} onClick={resetToLilota}>
-      Reset
+      <RiResetRightLine data-icon="inline-left" />Reset
     </Button>
   );
 }
 
-function BoardLabel() {
-  const { boardModel, flashProgress, state } = useSerial();
-  return (
-    <div className="text-right text-sm">
-      <div className="font-medium">State: {state}</div>
-      <div className="text-muted-foreground">
-        Board: {boardModel}
-      </div>
-      <p>Flash progress: {flashProgress}</p>
-    </div>
-  )
-}
-
 function DeviceCard() {
+  const {boardModel} = useSerial();
   return (
     <Card>
       <CardHeader>
         <CardTitle>Device</CardTitle>
 
         <CardContent className="flex flex-col gap-3">
+            Connect your ESP32 by plugging it in to your computer using a USB cable.
+            <br/>Make sure to use a good quality cable!
+            <br/>
           <div className="flex">
             <ConnectButton />
             <DisconnectButton />
-            <ResetButton />
           </div>
+          <p>// TODO: Reworked board detection<br/>Board: {boardModel}</p>
         </CardContent>
       </CardHeader>
     </Card>
@@ -93,36 +98,38 @@ function FlashCard() {
       <CardHeader>
         <CardTitle>Flash</CardTitle>
       </CardHeader>
-
-      <CardContent className="flex flex-col gap-3">
-        <FlashButton />
-      </CardContent>
-    </Card>
-  )
-}
-
-function WifiCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Wi-Fi</CardTitle>
-      </CardHeader>
-
-      <CardContent>
+      DROPDOWN MENU FOR FIRMWARE SELECTOR VIA GUTHIB API
+      <CardContent className="flex gap-3">
+                <Checkbox
+                    id="configure-after-flash"
+                />
+                <Label htmlFor="configure-after-flash">
+                    Erase existing flash
+                </Label>
         <WifiForm />
+        {/* <FlashButton /> */}
+        
       </CardContent>
+      <FlashProgressBar></FlashProgressBar>
+                  
     </Card>
   )
 }
 
 function TerminalCard() {
   return (
-    <Card className="min-h-130">
-      <CardHeader>
+    <Card className="flex min-h-0 flex-col">
+      <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Terminal</CardTitle>
+
+        <div className="please help flex gap-2">
+          <ResetButton />
+          <StartMonitorButton />
+          <StopMonitorButton />
+        </div>
       </CardHeader>
       <CardContent className="min-h-0 flex-1">
-        <div className="h-115 overflow-hidden border bg-black">
+        <div className="h-full min-h-115 overflow-hidden border bg-[#101214]">
           <SerialTerminal />
         </div>
       </CardContent>
@@ -145,17 +152,14 @@ export default function App() {
               </p>
             </div>
           </header>
-
-          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+          <div className="grid gap-4 ">
+            {/* <WorkflowPanel /> */}
             <div className="flex flex-col gap-4">
               <DeviceCard />
               <FlashCard />
-              <WifiCard />
             </div>
           </div>
-          <StartMonitorButton></StartMonitorButton>
-          <StopMonitorButton></StopMonitorButton>
-          <BoardLabel></BoardLabel>
+          {/* <BoardLabel></BoardLabel> */}
           <TerminalCard />
         </div>
       </main>

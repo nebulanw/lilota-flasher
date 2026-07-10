@@ -4,6 +4,7 @@ import { Button } from "./components/ui/button";
 import { Checkbox } from "./components/ui/checkbox";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
+import { RiDownload2Line } from "@remixicon/react";
 
 export function WifiForm() {
     const { configureWifi, flashFirmware, waitForLilotaPrompt, state } = useSerial();
@@ -54,6 +55,18 @@ export function WifiForm() {
 
     return (
         <form onSubmit={handleSubmit}>
+                        <div className="flex items-center gap-2">
+                <Checkbox
+                    id="configure-after-flash"
+                    checked={configureAfterFlash}
+                    onCheckedChange={(checked) => setConfigureAfterFlash(checked === true)}
+                    disabled={isConfiguring || isFlashing}
+                />
+                <Label htmlFor="configure-after-flash">
+                    Configure a Wi-Fi network
+                    <br/>(i) Lilota will create an Access Point otherwise.
+                </Label>
+            </div>
             <div className="space-y-2">
                 <Label htmlFor="wifi-ssid">SSID</Label>
                 <Input 
@@ -73,29 +86,9 @@ export function WifiForm() {
                     disabled={isConfiguring || isFlashing}
                 />
             </div>
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id="configure-after-flash"
-                    checked={configureAfterFlash}
-                    onCheckedChange={(checked) => setConfigureAfterFlash(checked === true)}
-                    disabled={isConfiguring || isFlashing}
-                />
-                <Label htmlFor="configure-after-flash">
-                    Configure Wi-Fi after flashing
-                </Label>
-            </div>
             <div className="flex gap-2">
-                <Button disabled={!canConfigure} type="submit">
-                    {isConfiguring ? "Configuring..." : "Configure Wi-Fi"}
-                </Button>
                 <Button disabled={!canFlash} type="button" onClick={handleFlashClick}>
-                    {isFlashing
-                        ? configureAfterFlash
-                            ? "Flashing & configuring..."
-                            : "Flashing..."
-                        : configureAfterFlash
-                            ? "Flash & Configure Wi-Fi"
-                            : "Flash Lilota"}
+                    <RiDownload2Line data-icon="inline-start" />{isFlashing ? "Flashing..." : "Flash"}
                 </Button>
             </div>
         </form>

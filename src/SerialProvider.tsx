@@ -30,7 +30,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
   const [boardModel, setBoardModel] = useState('Unknown');
-  const [flashProgress, setFlashProgress] = useState('--%');
+  const [flashProgress, setFlashProgress] = useState(0);
 
   function requireState(allowed: SerialState | SerialState[], action: string) {
     const list = Array.isArray(allowed) ? allowed: [allowed];
@@ -346,7 +346,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         compress: true,
         reportProgress: (_, written, total) => {
           const percent = (written / total) * 100;
-          setFlashProgress(`${percent.toFixed(1)}%`);
+          setFlashProgress(Math.round(percent));
         }
       }
 
