@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { WifiSecurity } from "./flashTypes";
+import type { WifiSecurity } from "@/types/flash";
 
 type WifiFieldsProps = {
   disabled: boolean;

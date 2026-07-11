@@ -19,8 +19,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSerial } from "@/useSerial";
+import type { FlashRequest, WifiSecurity } from "@/types/flash";
 import { WifiFields } from "./WifiFields";
-import type { FlashRequest, WifiSecurity } from "./flashTypes";
 
 export function FlashCard() {
   const { flashFirmware, flashProgress, state } = useSerial();

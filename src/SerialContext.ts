@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { FlashRequest } from './features/flash/flashTypes';
+import type { FlashRequest } from './types/flash';
 
 export type SerialState =
   | "disconnected" // nothing

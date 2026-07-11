@@ -1,17 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-  ESPLoader,
-  Transport,
-  FlashOptions,
-  FlashModeValues,
-  FlashFreqValues,
-  FlashSizeValues
-} from "esptool-js";
 import { SerialState, SerialContext } from './SerialContext';
-import type { FlashRequest, WifiConfiguration } from './features/flash/flashTypes';
+import type { FlashRequest } from './types/flash';
+import { loadDefaultFirmware } from './services/firmware';
+import { configureLilotaWifi, isLilotaPrompt } from './services/lilotaCommands';
+import { EspToolSession } from './services/espTool';
+import {
+  closeSerialPort,
+  openSerialPort,
+  requestAndOpenSerialPort,
+  resetEsp32,
+  SerialMonitor,
+  writeSerialData,
+} from './services/webSerial';
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const LILOTA_PROMPT_REGEX = /[^\r\n]*:\/# $/;
 const MAX_TERMINAL_BUFFER_CHARS = 100_000;
 const MAX_TERMINAL_LINE_CHARS = 4_096;
 const MAX_TERMINAL_DELIVERY_CHARS = 64_000;
@@ -37,19 +38,13 @@ function terminalSeparator(message: string, color = ANSI_BLUE) {
   return `\r\n${color}── ${message} ──${ANSI_RESET}\r\n`;
 }
 
-function tclBrace(value: string) {
-  return `{${value.replaceAll("\\", "\\\\").replaceAll("}", "\\}")}}`;
-}
-
 export function SerialProvider({ children }: { children: React.ReactNode }) {
   const portRef = useRef<SerialPort>(null);
-  const transportRef = useRef<Transport | null>(null);
-  const loaderRef = useRef<ESPLoader | null>(null);
+  const espToolSessionRef = useRef<EspToolSession | null>(null);
   const stateRef = useRef<SerialState>("disconnected");
-  const readerRef = useRef<ReadableStreamDefaultReader>(null);
   const terminalListenerRef = useRef(new Set<(chunk: string) => void>());
   const terminalBufferRef = useRef("");
-  const monitorTaskRef = useRef<Promise<void> | null>(null);
+  const serialMonitorRef = useRef<SerialMonitor | null>(null);
   const latestTerminalLineRef = useRef("");
   const promptWaitersRef = useRef(new Set<() => void>());
 
@@ -79,7 +74,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     latestTerminalLineRef.current =
       lastLineBreak === -1 ? combinedLine : combinedLine.slice(lastLineBreak + 1);
 
-    if (LILOTA_PROMPT_REGEX.test(latestTerminalLineRef.current)) {
+    if (isLilotaPrompt(latestTerminalLineRef.current)) {
       for (const resolve of promptWaitersRef.current) {
         resolve();
       }
@@ -100,7 +95,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   const waitForLilotaPrompt = useCallback(async () => {
     requireState("monitoring", "waitForLilotaPrompt");
 
-    if (LILOTA_PROMPT_REGEX.test(latestTerminalLineRef.current)) {
+    if (isLilotaPrompt(latestTerminalLineRef.current)) {
       return;
     }
 
@@ -155,21 +150,14 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     if (!port) {
       throw new Error("No port connected");
     }
-    // go to POWERON_RESET + SPI_FAST_FLASH_BOOT mode
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    await sleep(100);
-    await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-    await sleep(100);
-    await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    await sleep(100);
+    await resetEsp32(port);
   }, []);
 
   const connectPort = useCallback(async() => {
     requireState("disconnected", "connectPort")
     try {
       setState("connecting");
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
+      const port = await requestAndOpenSerialPort();
       portRef.current = port;
       setState("ready");
     } catch (error) {
@@ -183,92 +171,46 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
     const port = portRef.current;
 
-    if (!port?.readable) {
-      throw new Error("Port is not readable");
+    if (!port) {
+      throw new Error("No port connected");
     }
 
-    const reader = port.readable.getReader();
-    readerRef.current = reader;
-
-    const decoder = new TextDecoder();
+    const monitor = new SerialMonitor(port, appendTerminal);
+    serialMonitorRef.current = monitor;
     setState("monitoring");
 
-    const monitorTask = (async () => {
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          if (!value) continue;
-
-          const text = decoder.decode(value, { stream: true });
-
-          appendTerminal(text);
-        }
-      } finally {
-        reader.releaseLock();
-        readerRef.current = null;
-        monitorTaskRef.current = null;
-
-        if (stateRef.current === "monitoring") {
-          setState("ready");
-        }
+    void monitor.completed.then(
+      () => undefined,
+      (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        appendTerminal(terminalSeparator(`Serial monitor failed: ${message}`, ANSI_RED));
+      },
+    ).finally(() => {
+      if (serialMonitorRef.current === monitor) {
+        serialMonitorRef.current = null;
       }
-    })();
 
-    monitorTaskRef.current = monitorTask;
-
-    monitorTask.catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      appendTerminal(terminalSeparator(`Serial monitor failed: ${message}`, ANSI_RED));
-    })
+      if (stateRef.current === "monitoring") {
+        setState("ready");
+      }
+    });
   }, [appendTerminal, setState]);
 
   const writeSerial = useCallback(async (data: string) => {
     requireState("monitoring", "writeSerial");
 
     const port = portRef.current;
-    if (!port?.writable) {
-      throw new Error("Port is not writeable");
+    if (!port) {
+      throw new Error("No port connected");
     }
 
-    const writer = port.writable.getWriter();
-
-    try {
-      const encoded = new TextEncoder().encode(data);
-      await writer.write(encoded);
-    } finally {
-      writer.releaseLock();
-    }
+    await writeSerialData(port, data);
   }, []);
-
-  const sendLilotaCommand = useCallback(async (command: string) => {
-    for (let i = 0; i < command.length; i++) {
-      await writeSerial(command[i]);
-      await sleep(2);
-    }
-    await writeSerial("\r");
-    await sleep(250);
-  }, [writeSerial]);
-
-  const configureWifi = useCallback(async (configuration: WifiConfiguration) => {
-    requireState("monitoring", "configureWifi");
-
-    const password = configuration.security === "open"
-      ? ""
-      : configuration.password ?? "";
-
-    await sendLilotaCommand(`config set wifi_ssid ${tclBrace(configuration.ssid)}`);
-    await sendLilotaCommand(`config set wifi_pass ${tclBrace(password)}`);
-    // NOTE: Rebooting is the fastest way to reload the wifi configs
-    // I'm not sure if there's a way to avoid that
-    await sendLilotaCommand(`reboot`);
-  }, [sendLilotaCommand]);
 
   const stopSerialMonitor = useCallback(async () => {
     requireState("monitoring", "stopSerialMonitor");
 
-    await readerRef.current?.cancel();
-    await monitorTaskRef.current;
+    await serialMonitorRef.current?.stop();
   }, []);
 
   const disconnectPort = useCallback(async() => {
@@ -285,7 +227,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       await stopSerialMonitor();
     }
 
-    await port.close();
+    await closeSerialPort(port);
     portRef.current = null;
 
     setState("disconnected");
@@ -304,11 +246,10 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
     try {
       if (previousState === "monitoring") {
-        await readerRef.current?.cancel();
-        await monitorTaskRef.current;
+        await serialMonitorRef.current?.stop();
       }
 
-      await port.close();
+      await closeSerialPort(port);
     } catch (err) {
       setState("ready");
       throw err;
@@ -341,71 +282,37 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
       setState("esptool");
 
-      const transport = new Transport(port, true);
-      transportRef.current = transport;
-
-      const loader = new ESPLoader({
-        transport,
-        baudrate: 115200,
-        terminal: {
-          clean() {
-            appendTerminal(terminalSeparator("Esptool output", ANSI_CYAN));
-          },
-          writeLine(text: string) {
-            appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}\r\n`);
-          },
-          write(text: string) {
-            appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}`);
-          },
+      const espToolSession = new EspToolSession(port, {
+        clean() {
+          appendTerminal(terminalSeparator("Esptool output", ANSI_CYAN));
+        },
+        writeLine(text: string) {
+          appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}\r\n`);
+        },
+        write(text: string) {
+          appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}`);
         },
       });
+      espToolSessionRef.current = espToolSession;
 
-      loaderRef.current = loader;
-
-      const boardModelTmp = await loader.main();
+      const boardModelTmp = await espToolSession.connect();
       setBoardModel(boardModelTmp);
 
       setState("flashing");
 
-      const firmwareResponse = await fetch("/lilota/lilota-webflash.bin");
+      const firmware = await loadDefaultFirmware();
 
-      if (!firmwareResponse.ok) {
-        throw new Error(`Failed to load firmware: ${firmwareResponse.status}`);
-      }
-
-      const firmware = new Uint8Array(await firmwareResponse.arrayBuffer());
-
-      if (firmware.length === 0) {
-        throw new Error("Firmware file is empty");
-      }
-
-      const flashOptions: FlashOptions = {
-        fileArray: [
-          { data: firmware, address: 0x00 }
-        ],
-        flashMode: "keep" as FlashModeValues,
-        flashFreq: "keep" as FlashFreqValues,
-        flashSize: "4MB" as FlashSizeValues,
+      await espToolSession.writeFirmware(firmware, {
         eraseAll: request.eraseFlash,
-        compress: true,
-        reportProgress: (_, written, total) => {
-          const percent = (written / total) * 100;
-          setFlashProgress(Math.round(percent));
-        }
-      }
-
-      await loader.writeFlash(flashOptions);
+        onProgress: setFlashProgress,
+      });
 
       setState("handoff");
 
-      await loader.after("hard_reset");
-      await sleep(150);
-      await transport.disconnect();
+      await espToolSession.resetAndDisconnect();
+      espToolSessionRef.current = null;
 
-      transportRef.current = null;
-      loaderRef.current = null;
-
-      await port.open({ baudRate: 115200 });
+      await openSerialPort(port);
       rawSerialRestored = true;
 
       setState("ready");
@@ -415,21 +322,20 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
       if (request.wifi) {
         await waitForLilotaPrompt();
-        await configureWifi(request.wifi);
+        await configureLilotaWifi(writeSerial, request.wifi);
       }
     } catch (err) {
       if (!rawSerialRestored) {
         try {
-          await transportRef.current?.disconnect();
+          await espToolSessionRef.current?.disconnect();
         } catch (error) {
-          console.warn("Failed to disconnect transport during cleanup", error);
+          console.warn("Failed to disconnect esptool during cleanup", error);
         }
 
-        transportRef.current = null;
-        loaderRef.current = null;
+        espToolSessionRef.current = null;
 
         try {
-          await port.open({ baudRate: 115200 });
+          await openSerialPort(port);
           setState("ready");
         } catch (error) {
           console.warn("Failed to reopen serial port after flash fail", error);
@@ -440,7 +346,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
       throw err;
     }
-  }, [appendTerminal, configureWifi, releaseSerialPort, resetToLilota, setState, startSerialMonitor, waitForLilotaPrompt]);
+  }, [appendTerminal, releaseSerialPort, resetToLilota, setState, startSerialMonitor, waitForLilotaPrompt, writeSerial]);
 
   return (
     <SerialContext.Provider value={{
