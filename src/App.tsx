@@ -1,22 +1,11 @@
 import { SerialProvider } from "./SerialProvider";
 import { useSerial } from "./useSerial";
 import { SerialTerminal } from "./SerialTerminal";
-import { WifiForm } from "./WifiForm";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "./components/ui/label";
-import { Switch } from "./components/ui/switch";
-import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { RiResetRightLine, RiPlayLine, RiStopLine, RiDeleteBinLine } from "@remixicon/react";
 import { DeviceCard } from "./features/device/DeviceCard";
-
-function FlashProgressBar() {
-  const { flashProgress} = useSerial();
-  return <Progress value={flashProgress} className="w-full max-w-sm">
-    <ProgressLabel>Upload Progess</ProgressLabel>
-    <ProgressValue />
-  </Progress>
-}
+import { FlashCard } from "./features/flash/FlashCard";
 
 function ToggleMonitorButton() {
   const { startSerialMonitor, stopSerialMonitor, state } = useSerial();
@@ -66,30 +55,6 @@ function ResetButton() {
       <RiResetRightLine data-icon="inline-left" />Reset
     </Button>
   );
-}
-
-function FlashCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Flash</CardTitle>
-      </CardHeader>
-      <p>DROPDOWN MENU FOR FIRMWARE SELECTOR VIA GUTHIB API</p>
-      <CardContent className="flex gap-3">
-        <div className="flex items-start gap-2">
-          <Switch
-              id="erase-flash"
-          />
-          <Label htmlFor="erase-flash">
-              Erase existing flash
-          </Label>
-        </div>
-        <WifiForm />
-      </CardContent>
-      <FlashProgressBar></FlashProgressBar>
-                  
-    </Card>
-  )
 }
 
 function TerminalCard() {

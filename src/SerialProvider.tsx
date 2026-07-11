@@ -8,6 +8,7 @@ import {
   FlashSizeValues
 } from "esptool-js";
 import { SerialState, SerialContext } from './SerialContext';
+import type { FlashRequest, WifiConfiguration } from './features/flash/flashTypes';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const LILOTA_PROMPT_REGEX = /[^\r\n]*:\/# $/;
@@ -77,14 +78,12 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     }
 
     await new Promise<void>((resolve, reject) => {
-      let timeoutId: number;
-
       const resolveWaiter = () => {
         window.clearTimeout(timeoutId);
         resolve();
       };
 
-      timeoutId = window.setTimeout(() => {
+      const timeoutId = window.setTimeout(() => {
         promptWaitersRef.current.delete(resolveWaiter);
         reject(new Error("Timed out waiting for Lilota prompt"));
       }, 15_000);
@@ -226,11 +225,18 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     await sleep(250);
   }, [writeSerial]);
 
-  const configureWifi = useCallback(async (ssid: string, password: string) => {
+  const configureWifi = useCallback(async (configuration: WifiConfiguration) => {
     requireState("monitoring", "configureWifi");
 
-    await sendLilotaCommand(`config set wifi_ssid ${tclBrace(ssid)}`);
+    const password = configuration.security === "open"
+      ? ""
+      : configuration.password ?? "";
+
+    await sendLilotaCommand(`config set wifi_ssid ${tclBrace(configuration.ssid)}`);
     await sendLilotaCommand(`config set wifi_pass ${tclBrace(password)}`);
+    // NOTE: Rebooting is the fastest way to reload the wifi configs
+    // I'm not sure if there's a way to avoid that
+    await sendLilotaCommand(`reboot`);
   }, [sendLilotaCommand]);
 
   const stopSerialMonitor = useCallback(async () => {
@@ -284,13 +290,26 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setState])
 
-  const flashLilota = useCallback(async() => {
+  const flashLilota = useCallback(async(request: FlashRequest) => {
     requireState(["ready", "monitoring"], "flashLilota");
 
     const port = portRef.current;
     if (!port) {
       throw new Error("No port connected");
     }
+
+    if (request.wifi) {
+      if (!request.wifi.ssid.trim()) {
+        throw new Error("A Wi-Fi SSID is required");
+      }
+
+      if (request.wifi.security === "wpa2-personal" && !request.wifi.password) {
+        throw new Error("A password is required for WPA2-Personal networks");
+      }
+    }
+
+    setFlashProgress(0);
+    let rawSerialRestored = false;
 
     try {
       await releaseSerialPort();
@@ -342,7 +361,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         flashMode: "keep" as FlashModeValues,
         flashFreq: "keep" as FlashFreqValues,
         flashSize: "4MB" as FlashSizeValues,
-        eraseAll: true, // TODO: make a checkbox
+        eraseAll: request.eraseFlash,
         compress: true,
         reportProgress: (_, written, total) => {
           const percent = (written / total) * 100;
@@ -362,39 +381,46 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       loaderRef.current = null;
 
       await port.open({ baudRate: 115200 });
+      rawSerialRestored = true;
 
       setState("ready");
+      latestTerminalLineRef.current = "";
       await resetToLilota();
       await startSerialMonitor();
-    } catch (err) {
-      try {
-        await transportRef.current?.disconnect();
-      } catch (error) {
-        console.warn("Failed to disconnect transport during cleanup", error);
+
+      if (request.wifi) {
+        await waitForLilotaPrompt();
+        await configureWifi(request.wifi);
       }
+    } catch (err) {
+      if (!rawSerialRestored) {
+        try {
+          await transportRef.current?.disconnect();
+        } catch (error) {
+          console.warn("Failed to disconnect transport during cleanup", error);
+        }
 
-      transportRef.current = null;
-      loaderRef.current = null;
+        transportRef.current = null;
+        loaderRef.current = null;
 
-      try {
-        await port.open({ baudRate: 115200 });
-        setState("ready");
-      } catch (error) {
-        console.warn("Failed to reopen serial port after flash fail", error);
-        portRef.current = null;
-        setState("disconnected");
+        try {
+          await port.open({ baudRate: 115200 });
+          setState("ready");
+        } catch (error) {
+          console.warn("Failed to reopen serial port after flash fail", error);
+          portRef.current = null;
+          setState("disconnected");
+        }
       }
 
       throw err;
     }
-  }, [appendTerminal, releaseSerialPort, resetToLilota, setState, startSerialMonitor]);
+  }, [appendTerminal, configureWifi, releaseSerialPort, resetToLilota, setState, startSerialMonitor, waitForLilotaPrompt]);
 
   return (
     <SerialContext.Provider value={{
       boardModel,
       flashProgress,
-      configureWifi,
-      waitForLilotaPrompt,
       connectPort,
       disconnectPort,
       startSerialMonitor,

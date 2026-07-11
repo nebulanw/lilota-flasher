@@ -1,4 +1,5 @@
 import { createContext } from 'react';
+import type { FlashRequest } from './features/flash/flashTypes';
 
 export type SerialState =
   | "disconnected" // nothing
@@ -14,13 +15,11 @@ export type SerialContextValue = {
   boardModel: string;
   flashProgress: number;
   state: SerialState;
-  configureWifi: (ssid: string, password: string) => Promise<void>;
-  waitForLilotaPrompt: () => Promise<void>;
   connectPort: () => Promise<void>;
   disconnectPort: () => Promise<void>;
   startSerialMonitor: () => Promise<void>;
   stopSerialMonitor: () => Promise<void>;
-  flashFirmware: () => Promise<void>;
+  flashFirmware: (request: FlashRequest) => Promise<void>;
   resetToLilota: () => Promise<void>;
   subscribeTerminal: (listener: (chunk: string) => void) => () => void;
   getTerminalBuffer: () => string;
