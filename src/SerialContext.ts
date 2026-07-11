@@ -1,9 +1,11 @@
 import { createContext } from 'react';
 import type { FlashRequest } from './types/flash';
+import type { DeviceInfo } from './types/device';
 
 export type SerialState =
   | "disconnected" // nothing
   | "connecting"   // user picked port + opening port
+  | "detecting" // esptool is identifying the selected device
   | "ready" // raw serial port open at baud
   | "monitoring" // raw serial monitor using stream
   | "esptool"        // esptool's transport using stream
@@ -12,7 +14,7 @@ export type SerialState =
   | "handoff";      // esptool -> raw serial (???)
 
 export type SerialContextValue = {
-  boardModel: string;
+  deviceInfo: DeviceInfo | null;
   flashProgress: number;
   state: SerialState;
   connectPort: () => Promise<void>;

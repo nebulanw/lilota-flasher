@@ -3,10 +3,8 @@ const RESET_SIGNAL_DELAY_MS = 100;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function requestAndOpenSerialPort() {
-  const port = await navigator.serial.requestPort();
-  await openSerialPort(port);
-  return port;
+export async function requestSerialPort() {
+  return navigator.serial.requestPort();
 }
 
 export async function openSerialPort(port: SerialPort) {

@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { RiLinkUnlinkM, RiUsbLine } from "@remixicon/react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSerial } from "@/useSerial";
-import { SerialState } from "@/SerialContext";
+import type { SerialState } from "@/SerialContext";
 
 // for device status badge
 const getConnectionStatus = (state: SerialState) => {
@@ -14,6 +15,9 @@ const getConnectionStatus = (state: SerialState) => {
     
     case "connecting":
       return { label: "Connecting...", variant: "outline" as const };
+
+    case "detecting":
+      return { label: "Detecting device...", variant: "outline" as const };
     
     case "ready":
       return { label: "Connected", variant: "default" as const };
@@ -30,14 +34,35 @@ const getConnectionStatus = (state: SerialState) => {
 }
 
 export function DeviceCard() {
-  const { state, boardModel, connectPort, disconnectPort } = useSerial();
+  const { state, deviceInfo, connectPort, disconnectPort } = useSerial();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isDisconnected = state === "disconnected";
-  const isConnecting = state === "connecting";
+  const isConnecting = state === "connecting" || state === "detecting";
   const canDisconnect = state === "ready" || state === "monitoring";
   const isConnected = !isDisconnected && !isConnecting;
 
   const connectionStatus = getConnectionStatus(state);
+
+  const handleConnect = async () => {
+    setErrorMessage(null);
+
+    try {
+      await connectPort();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setErrorMessage(null);
+
+    try {
+      await disconnectPort();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <Card>
@@ -55,7 +80,7 @@ export function DeviceCard() {
         <div className="flex gap-2">
           <Button
             disabled={!isDisconnected}
-            onClick={() => void connectPort()}
+            onClick={() => void handleConnect()}
           >
             <RiUsbLine data-icon="inline-start" />
             {isConnecting ? "Connecting..." : "Connect"}
@@ -63,7 +88,7 @@ export function DeviceCard() {
 
           <Button
             disabled={!canDisconnect}
-            onClick={() => void disconnectPort()}
+            onClick={() => void handleDisconnect()}
           >
             <RiLinkUnlinkM data-icon="inline-start" />
             Disconnect
@@ -75,8 +100,43 @@ export function DeviceCard() {
           State: {connectionStatus.label}
         </Badge>
 
-        {isConnected && boardModel !== "Unknown" && (
-          <p>Board: {boardModel}</p>
+        {errorMessage && (
+          <p role="alert" className="text-xs text-destructive">
+            {errorMessage}
+          </p>
+        )}
+
+        {isConnected && deviceInfo && (
+          <div className="grid gap-2">
+            <p className="text-sm font-medium">Device information</p>
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
+              <dt className="text-muted-foreground">Family</dt>
+              <dd>{deviceInfo.family}</dd>
+
+              <dt className="text-muted-foreground">Model</dt>
+              <dd>{deviceInfo.model}</dd>
+
+              {deviceInfo.revision !== undefined && (
+                <>
+                  <dt className="text-muted-foreground">Revision</dt>
+                  <dd>{deviceInfo.revision}</dd>
+                </>
+              )}
+
+              <dt className="text-muted-foreground">Crystal</dt>
+              <dd>{deviceInfo.crystalFrequencyMhz} MHz</dd>
+
+              <dt className="text-muted-foreground">MAC address</dt>
+              <dd className="font-mono">{deviceInfo.macAddress}</dd>
+
+              {deviceInfo.features.length > 0 && (
+                <>
+                  <dt className="text-muted-foreground">Features</dt>
+                  <dd>{deviceInfo.features.join(", ")}</dd>
+                </>
+              )}
+            </dl>
+          </div>
         )}
       </CardContent>
     </Card>

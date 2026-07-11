@@ -7,11 +7,12 @@ import { EspToolSession } from './services/espTool';
 import {
   closeSerialPort,
   openSerialPort,
-  requestAndOpenSerialPort,
+  requestSerialPort,
   resetEsp32,
   SerialMonitor,
   writeSerialData,
 } from './services/webSerial';
+import type { DeviceInfo } from './types/device';
 
 const MAX_TERMINAL_BUFFER_CHARS = 100_000;
 const MAX_TERMINAL_LINE_CHARS = 4_096;
@@ -26,6 +27,7 @@ const ANSI_YELLOW = "\x1b[33m";
 const SERIAL_STATE_LABELS: Record<SerialState, string> = {
   disconnected: "Disconnected",
   connecting: "Connecting",
+  detecting: "Detecting device",
   ready: "Ready",
   monitoring: "Monitoring",
   "flash-prepare": "Preparing flash",
@@ -49,7 +51,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   const promptWaitersRef = useRef(new Set<() => void>());
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
-  const [boardModel, setBoardModel] = useState('Unknown');
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [flashProgress, setFlashProgress] = useState(0);
 
   function requireState(allowed: SerialState | SerialState[], action: string) {
@@ -143,6 +145,20 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     }
   }, [appendTerminal]);
 
+  const createEspToolSession = useCallback((port: SerialPort) => {
+    return new EspToolSession(port, {
+      clean() {
+        appendTerminal(terminalSeparator("Esptool output", ANSI_CYAN));
+      },
+      writeLine(text: string) {
+        appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}\r\n`);
+      },
+      write(text: string) {
+        appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}`);
+      },
+    });
+  }, [appendTerminal]);
+
   const resetToLilota = useCallback(async() => {
     requireState(["ready", "monitoring"], "resetToLilota");
 
@@ -155,16 +171,50 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
   const connectPort = useCallback(async() => {
     requireState("disconnected", "connectPort")
+
+    let port: SerialPort | null = null;
+
     try {
       setState("connecting");
-      const port = await requestAndOpenSerialPort();
+      setDeviceInfo(null);
+
+      port = await requestSerialPort();
       portRef.current = port;
+
+      setState("detecting");
+      const espToolSession = createEspToolSession(port);
+      espToolSessionRef.current = espToolSession;
+
+      const detectedDevice = await espToolSession.detectDevice();
+      await espToolSession.resetAndDisconnect();
+      espToolSessionRef.current = null;
+
+      await openSerialPort(port);
+      setDeviceInfo(detectedDevice);
       setState("ready");
     } catch (error) {
+      try {
+        await espToolSessionRef.current?.disconnect();
+      } catch (cleanupError) {
+        console.warn("Failed to disconnect esptool after detection failure", cleanupError);
+      }
+
+      espToolSessionRef.current = null;
+
+      if (port?.readable || port?.writable) {
+        try {
+          await closeSerialPort(port);
+        } catch (cleanupError) {
+          console.warn("Failed to close serial port after detection failure", cleanupError);
+        }
+      }
+
+      portRef.current = null;
+      setDeviceInfo(null);
       setState("disconnected");
       throw error;
     }
-  }, [setState]);
+  }, [createEspToolSession, setState]);
 
   const startSerialMonitor = useCallback(async () => {
     requireState("ready", "startSerialMonitor");
@@ -219,6 +269,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
     const port = portRef.current;
     if (!port) {
+      setDeviceInfo(null);
       setState("disconnected");
       return;
     }
@@ -229,6 +280,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
     await closeSerialPort(port);
     portRef.current = null;
+    setDeviceInfo(null);
 
     setState("disconnected");
   }, [setState, stopSerialMonitor]);
@@ -282,21 +334,11 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
       setState("esptool");
 
-      const espToolSession = new EspToolSession(port, {
-        clean() {
-          appendTerminal(terminalSeparator("Esptool output", ANSI_CYAN));
-        },
-        writeLine(text: string) {
-          appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}\r\n`);
-        },
-        write(text: string) {
-          appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}`);
-        },
-      });
+      const espToolSession = createEspToolSession(port);
       espToolSessionRef.current = espToolSession;
 
-      const boardModelTmp = await espToolSession.connect();
-      setBoardModel(boardModelTmp);
+      const detectedDevice = await espToolSession.detectDevice();
+      setDeviceInfo(detectedDevice);
 
       setState("flashing");
 
@@ -340,17 +382,18 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
           console.warn("Failed to reopen serial port after flash fail", error);
           portRef.current = null;
+          setDeviceInfo(null);
           setState("disconnected");
         }
       }
 
       throw err;
     }
-  }, [appendTerminal, releaseSerialPort, resetToLilota, setState, startSerialMonitor, waitForLilotaPrompt, writeSerial]);
+  }, [createEspToolSession, releaseSerialPort, resetToLilota, setState, startSerialMonitor, waitForLilotaPrompt, writeSerial]);
 
   return (
     <SerialContext.Provider value={{
-      boardModel,
+      deviceInfo,
       flashProgress,
       connectPort,
       disconnectPort,

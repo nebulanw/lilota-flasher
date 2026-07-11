@@ -6,6 +6,7 @@ import {
   type FlashModeValues,
   type FlashSizeValues,
 } from "esptool-js";
+import type { DeviceInfo } from "@/types/device";
 
 const ESPTOOL_BAUD_RATE = 115_200;
 const RESET_SETTLE_DELAY_MS = 150;
@@ -37,8 +38,24 @@ export class EspToolSession {
     });
   }
 
-  async connect() {
-    return this.loader.main();
+  async detectDevice(): Promise<DeviceInfo> {
+    const model = await this.loader.main();
+    const chip = this.loader.chip;
+    const revision = chip.getChipRevision
+      ? await chip.getChipRevision(this.loader)
+      : undefined;
+    const features = await chip.getChipFeatures(this.loader);
+    const crystalFrequencyMhz = await chip.getCrystalFreq(this.loader);
+    const macAddress = await chip.readMac(this.loader);
+
+    return {
+      family: chip.CHIP_NAME,
+      model,
+      revision,
+      features,
+      crystalFrequencyMhz,
+      macAddress,
+    };
   }
 
   async writeFirmware(
