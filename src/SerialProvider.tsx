@@ -12,6 +12,30 @@ import type { FlashRequest, WifiConfiguration } from './features/flash/flashType
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const LILOTA_PROMPT_REGEX = /[^\r\n]*:\/# $/;
+const MAX_TERMINAL_BUFFER_CHARS = 100_000;
+const MAX_TERMINAL_LINE_CHARS = 4_096;
+const MAX_TERMINAL_DELIVERY_CHARS = 64_000;
+const CLEAR_TERMINAL_SEQUENCE = "\x1b[2J\x1b[3J\x1b[H";
+const ANSI_RESET = "\x1b[0m";
+const ANSI_BLUE = "\x1b[38;5;75m";
+const ANSI_CYAN = "\x1b[36m";
+const ANSI_RED = "\x1b[31m";
+const ANSI_YELLOW = "\x1b[33m";
+
+const SERIAL_STATE_LABELS: Record<SerialState, string> = {
+  disconnected: "Disconnected",
+  connecting: "Connecting",
+  ready: "Ready",
+  monitoring: "Monitoring",
+  "flash-prepare": "Preparing flash",
+  esptool: "Bootloader",
+  flashing: "Flashing",
+  handoff: "Restoring serial",
+};
+
+function terminalSeparator(message: string, color = ANSI_BLUE) {
+  return `\r\n${color}── ${message} ──${ANSI_RESET}\r\n`;
+}
 
 function tclBrace(value: string) {
   return `{${value.replaceAll("\\", "\\\\").replaceAll("}", "\\}")}}`;
@@ -41,14 +65,12 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   }
 
   const appendTerminal = useCallback((chunk: string) => {
-    terminalBufferRef.current += chunk;
+    const retainedChunk = chunk.slice(-MAX_TERMINAL_BUFFER_CHARS);
+    terminalBufferRef.current =
+      (terminalBufferRef.current + retainedChunk).slice(-MAX_TERMINAL_BUFFER_CHARS);
 
-    // keep the replay buffer from growing forever
-    if (terminalBufferRef.current.length > 200_000) {
-      terminalBufferRef.current = terminalBufferRef.current.slice(-200_000);
-    }
-
-    const combinedLine = latestTerminalLineRef.current + chunk;
+    const combinedLine =
+      (latestTerminalLineRef.current + retainedChunk).slice(-MAX_TERMINAL_LINE_CHARS);
     const lastLineBreak = Math.max(
       combinedLine.lastIndexOf("\r"),
       combinedLine.lastIndexOf("\n")
@@ -65,8 +87,13 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       promptWaitersRef.current.clear();
     }
 
+    const deliveredChunk = chunk.length > MAX_TERMINAL_DELIVERY_CHARS
+      ? terminalSeparator("Oversized terminal output truncated", ANSI_YELLOW) +
+        chunk.slice(-MAX_TERMINAL_DELIVERY_CHARS)
+      : chunk;
+
     for (const listener of terminalListenerRef.current) {
-      listener(chunk);
+      listener(deliveredChunk);
     }
   }, []);
 
@@ -105,11 +132,8 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
   const clearTerminalBuffer = useCallback(() => {
     terminalBufferRef.current = "";
-    appendTerminal("\x1bc");
-  }, [appendTerminal]);
-
-  const terminalInfo = useCallback((message: string) => {
-    appendTerminal(`\r\n[system] ${message}\r\n`);
+    latestTerminalLineRef.current = "";
+    appendTerminal(CLEAR_TERMINAL_SEQUENCE);
   }, [appendTerminal]);
 
   const setState = useCallback((next: SerialState) => {
@@ -118,9 +142,11 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     _setState(next);
 
     if (prev !== next) {
-      terminalInfo(`${prev} -> ${next}`);
+      appendTerminal(terminalSeparator(
+        `${SERIAL_STATE_LABELS[prev]} → ${SERIAL_STATE_LABELS[next]}`
+      ));
     }
-  }, [terminalInfo]);
+  }, [appendTerminal]);
 
   const resetToLilota = useCallback(async() => {
     requireState(["ready", "monitoring"], "resetToLilota");
@@ -192,9 +218,8 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     monitorTaskRef.current = monitorTask;
 
     monitorTask.catch((error) => {
-      appendTerminal(`\r\n[system] Serial monitor failed: ${
-        error instanceof Error ? error.message : String(error)
-      }\r\n`)
+      const message = error instanceof Error ? error.message : String(error);
+      appendTerminal(terminalSeparator(`Serial monitor failed: ${message}`, ANSI_RED));
     })
   }, [appendTerminal, setState]);
 
@@ -324,13 +349,13 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         baudrate: 115200,
         terminal: {
           clean() {
-            appendTerminal("\r\n[esptool] ------------------------------\r\n");
+            appendTerminal(terminalSeparator("Esptool output", ANSI_CYAN));
           },
           writeLine(text: string) {
-            appendTerminal(`[esptool] ${text}\r\n`);
+            appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}\r\n`);
           },
           write(text: string) {
-            appendTerminal(text);
+            appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}`);
           },
         },
       });
