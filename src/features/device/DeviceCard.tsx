@@ -25,10 +25,10 @@ const getConnectionStatus = (state: SerialState) => {
     case "monitoring":
       return { label: "Connected - Monitoring", variant: "default" as const };
     
-    case "flash-prepare":
-    case "esptool":
+    case "preparing-flash":
+    case "bootloader":
     case "flashing":
-    case "handoff":
+    case "restoring-serial":
       return { label: "Connected - Busy", variant: "default" as const };
   }
 }

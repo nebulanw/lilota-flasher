@@ -37,7 +37,7 @@ export function FlashCard() {
   const hasValidWifi = !configureWifi || (hasSsid && hasRequiredPassword);
   const serialReady = state === "ready" || state === "monitoring";
   const canFlash = serialReady && hasValidWifi && !isSubmitting;
-  const controlsDisabled = isSubmitting;
+  const controlsDisabled = !serialReady || isSubmitting;
 
   const handleSubmit: ComponentProps<"form">["onSubmit"] = async (event) => {
     event.preventDefault();
@@ -69,13 +69,23 @@ export function FlashCard() {
   };
 
   return (
-    <Card>
+    <Card aria-disabled={!serialReady}>
       <CardHeader>
         <CardTitle>Flash</CardTitle>
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={handleSubmit} className="grid gap-6">
+        {!serialReady && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            Connect a compatible device to configure and flash Lilota.
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <fieldset
+            disabled={controlsDisabled}
+            className="grid gap-6 disabled:opacity-50"
+          >
           <div className="grid gap-2">
             <Label htmlFor="lilota-build">Lilota build</Label>
             <Select value="default" disabled>
@@ -117,6 +127,7 @@ export function FlashCard() {
                       type="button"
                       variant="ghost"
                       size="icon-xs"
+                      disabled={controlsDisabled}
                       aria-label="About Wi-Fi configuration"
                     />
                   }
@@ -157,6 +168,7 @@ export function FlashCard() {
               <ProgressValue />
             </Progress>
           </div>
+          </fieldset>
         </form>
       </CardContent>
     </Card>

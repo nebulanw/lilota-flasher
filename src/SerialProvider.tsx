@@ -16,18 +16,6 @@ import {
 import type { DeviceInfo } from './types/device';
 import { TerminalOutput } from './terminal/TerminalOutput';
 
-const SERIAL_STATE_LABELS: Record<SerialState, string> = {
-  disconnected: "Disconnected",
-  connecting: "Connecting",
-  detecting: "Detecting device",
-  ready: "Ready",
-  monitoring: "Monitoring",
-  "flash-prepare": "Preparing flash",
-  esptool: "Bootloader",
-  flashing: "Flashing",
-  handoff: "Restoring serial",
-};
-
 export function SerialProvider({ children }: { children: React.ReactNode }) {
   const portRef = useRef<SerialPort>(null);
   const espToolSessionRef = useRef<EspToolSession | null>(null);
@@ -70,16 +58,9 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   }, [terminalOutput]);
 
   const setState = useCallback((next: SerialState) => {
-    const prev = stateRef.current;
     stateRef.current = next;
     _setState(next);
-
-    if (prev !== next) {
-      terminalOutput.appendSeparator(
-        `${SERIAL_STATE_LABELS[prev]} → ${SERIAL_STATE_LABELS[next]}`
-      );
-    }
-  }, [terminalOutput]);
+  }, []);
 
   const removePortDisconnectListener = useCallback(() => {
     removePortDisconnectListenerRef.current?.();
@@ -272,7 +253,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     }
 
     const previousState = stateRef.current;
-    setState("flash-prepare");
+    setState("preparing-flash");
 
     try {
       if (previousState === "monitoring") {
@@ -310,7 +291,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     try {
       await releaseSerialPort();
 
-      setState("esptool");
+      setState("bootloader");
 
       const espToolSession = createEspToolSession(port);
       espToolSessionRef.current = espToolSession;
@@ -327,7 +308,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         onProgress: setFlashProgress,
       });
 
-      setState("handoff");
+      setState("restoring-serial");
 
       await espToolSession.resetAndDisconnect();
       espToolSessionRef.current = null;

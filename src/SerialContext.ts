@@ -3,15 +3,15 @@ import type { FlashRequest } from './types/flash';
 import type { DeviceInfo } from './types/device';
 
 export type SerialState =
-  | "disconnected" // nothing
-  | "connecting"   // user picked port + opening port
+  | "disconnected" // no selected port
+  | "connecting" // waiting for the user to select a port
   | "detecting" // esptool is identifying the selected device
-  | "ready" // raw serial port open at baud
-  | "monitoring" // raw serial monitor using stream
-  | "esptool"        // esptool's transport using stream
-  | "flashing"       // flashing (flashing)
-  | "flash-prepare" // should just be called "has port but not opened"
-  | "handoff";      // esptool -> raw serial (???)
+  | "ready" // raw serial is open and idle
+  | "monitoring" // raw serial reader is active
+  | "preparing-flash" // raw serial is being released
+  | "bootloader" // esptool owns the port
+  | "flashing" // firmware is being written
+  | "restoring-serial"; // esptool is handing the port back
 
 export type SerialContextValue = {
   deviceInfo: DeviceInfo | null;
