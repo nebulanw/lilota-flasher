@@ -30,15 +30,33 @@ export async function configureLilotaWifi(
   write: SerialWriter,
   configuration: WifiConfiguration,
 ) {
-  const password = configuration.security === "open"
+  const authenticationMode = configuration.authentication === "wpa2-enterprise"
+    ? "wpa2_enterprise"
+    : "wpa2_psk";
+  const password = configuration.authentication === "open"
     ? ""
     : configuration.password ?? "";
 
   await sendLilotaCommand(
     write,
+    `config set wifi_auth_mode ${authenticationMode}`,
+  );
+  await sendLilotaCommand(
+    write,
     `config set wifi_ssid ${tclBrace(configuration.ssid)}`,
   );
   await sendLilotaCommand(write, `config set wifi_pass ${tclBrace(password)}`);
+
+  if (configuration.authentication === "wpa2-enterprise") {
+    await sendLilotaCommand(
+      write,
+      `config set wifi_identity ${tclBrace(configuration.identity ?? "")}`,
+    );
+    await sendLilotaCommand(
+      write,
+      `config set wifi_username ${tclBrace(configuration.username ?? "")}`,
+    );
+  }
 
   // Lilota reloads its Wi-Fi configuration during startup.
   await sendLilotaCommand(write, "reboot");

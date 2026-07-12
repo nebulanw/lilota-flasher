@@ -19,22 +19,29 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useSerial } from "@/useSerial";
-import type { FlashRequest, WifiSecurity } from "@/types/flash";
+import type { FlashRequest, WifiAuthentication } from "@/types/flash";
 import { WifiFields } from "./WifiFields";
 
 export function FlashCard() {
   const { flashFirmware, flashProgress, state } = useSerial();
   const [eraseFlash, setEraseFlash] = useState(false);
   const [configureWifi, setConfigureWifi] = useState(false);
-  const [wifiSecurity, setWifiSecurity] = useState<WifiSecurity>("wpa2-personal");
+  const [wifiAuthentication, setWifiAuthentication] =
+    useState<WifiAuthentication>("wpa2-psk");
   const [ssid, setSsid] = useState("");
   const [password, setPassword] = useState("");
+  const [identity, setIdentity] = useState("");
+  const [username, setUsername] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const hasSsid = ssid.trim().length > 0;
-  const hasRequiredPassword = wifiSecurity === "open" || password.length > 0;
-  const hasValidWifi = !configureWifi || (hasSsid && hasRequiredPassword);
+  const hasRequiredCredentials =
+    wifiAuthentication === "open" ||
+    (password.length > 0 &&
+      (wifiAuthentication !== "wpa2-enterprise" ||
+        (identity.trim().length > 0 && username.trim().length > 0)));
+  const hasValidWifi = !configureWifi || (hasSsid && hasRequiredCredentials);
   const serialReady = state === "ready" || state === "monitoring";
   const canFlash = serialReady && hasValidWifi && !isSubmitting;
   const controlsDisabled = !serialReady || isSubmitting;
@@ -49,8 +56,16 @@ export function FlashCard() {
       wifi: configureWifi
         ? {
             ssid: ssid.trim(),
-            security: wifiSecurity,
-            password: wifiSecurity === "open" ? undefined : password,
+            authentication: wifiAuthentication,
+            password: wifiAuthentication === "open" ? undefined : password,
+            identity:
+              wifiAuthentication === "wpa2-enterprise"
+                ? identity.trim()
+                : undefined,
+            username:
+              wifiAuthentication === "wpa2-enterprise"
+                ? username.trim()
+                : undefined,
           }
         : undefined,
     };
@@ -160,15 +175,25 @@ export function FlashCard() {
                 </div>
               </div>
 
-              <WifiFields
-                disabled={!configureWifi || controlsDisabled}
-                ssid={ssid}
-                password={password}
-                security={wifiSecurity}
-                onSsidChange={setSsid}
-                onPasswordChange={setPassword}
-                onSecurityChange={setWifiSecurity}
-              />
+              {configureWifi ? (
+                <WifiFields
+                  disabled={controlsDisabled}
+                  ssid={ssid}
+                  password={password}
+                  identity={identity}
+                  username={username}
+                  authentication={wifiAuthentication}
+                  onSsidChange={setSsid}
+                  onPasswordChange={setPassword}
+                  onIdentityChange={setIdentity}
+                  onUsernameChange={setUsername}
+                  onAuthenticationChange={setWifiAuthentication}
+                />
+              ) : (
+                <div className="flex min-h-24 items-center border border-dashed px-4 py-3 text-xs text-muted-foreground">
+                  Wi-Fi configuration is disabled. Lilota will start its own access point.
+                </div>
+              )}
             </div>
 
             {errorMessage && (

@@ -278,8 +278,22 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         throw new Error("A Wi-Fi SSID is required");
       }
 
-      if (request.wifi.security === "wpa2-personal" && !request.wifi.password) {
+      if (request.wifi.authentication === "wpa2-psk" && !request.wifi.password) {
         throw new Error("A password is required for WPA2-Personal networks");
+      }
+
+      if (request.wifi.authentication === "wpa2-enterprise") {
+        if (!request.wifi.identity?.trim()) {
+          throw new Error("An identity is required for WPA2-Enterprise networks");
+        }
+
+        if (!request.wifi.username?.trim()) {
+          throw new Error("A username is required for WPA2-Enterprise networks");
+        }
+
+        if (!request.wifi.password) {
+          throw new Error("A password is required for WPA2-Enterprise networks");
+        }
       }
     }
 

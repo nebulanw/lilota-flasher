@@ -7,46 +7,63 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { WifiSecurity } from "@/types/flash";
+import type { WifiAuthentication } from "@/types/flash";
 
 type WifiFieldsProps = {
   disabled: boolean;
   ssid: string;
   password: string;
-  security: WifiSecurity;
+  identity: string;
+  username: string;
+  authentication: WifiAuthentication;
   onSsidChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
-  onSecurityChange: (value: WifiSecurity) => void;
+  onIdentityChange: (value: string) => void;
+  onUsernameChange: (value: string) => void;
+  onAuthenticationChange: (value: WifiAuthentication) => void;
 };
 
 export function WifiFields({
   disabled,
   ssid,
   password,
-  security,
+  identity,
+  username,
+  authentication,
   onSsidChange,
   onPasswordChange,
-  onSecurityChange,
+  onIdentityChange,
+  onUsernameChange,
+  onAuthenticationChange,
 }: WifiFieldsProps) {
-  const isOpenNetwork = security === "open";
+  const isOpenNetwork = authentication === "open";
+  const isEnterprise = authentication === "wpa2-enterprise";
+
+  const authenticationLabel = {
+    open: "Open",
+    "wpa2-psk": "WPA2-Personal",
+    "wpa2-enterprise": "WPA2-Enterprise",
+  }[authentication];
 
   return (
-    <fieldset disabled={disabled} className="grid gap-4 disabled:opacity-50">
+    <fieldset
+      disabled={disabled}
+      className="grid content-start gap-4 disabled:opacity-50"
+    >
       <div className="grid gap-2">
-        <Label htmlFor="wifi-security">Security</Label>
+        <Label htmlFor="wifi-authentication">Authentication</Label>
         <Select
-          value={security}
-          onValueChange={(value) => onSecurityChange(value as WifiSecurity)}
+          value={authentication}
+          onValueChange={(value) => onAuthenticationChange(value as WifiAuthentication)}
           disabled={disabled}
         >
-          <SelectTrigger id="wifi-security" className="w-full">
-            <SelectValue>
-              {security === "open" ? "Open" : "WPA2-Personal"}
-            </SelectValue>
+          <SelectTrigger id="wifi-authentication" className="w-full">
+            <SelectValue>{authenticationLabel}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="wpa2-personal">WPA2-Personal</SelectItem>
             <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="wpa2-psk">WPA2-Personal</SelectItem>
+            <SelectItem value="wpa2-enterprise">WPA2-Enterprise</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -62,18 +79,45 @@ export function WifiFields({
         />
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="wifi-password">Password</Label>
-        <Input
-          id="wifi-password"
-          type="password"
-          value={isOpenNetwork ? "" : password}
-          onChange={(event) => onPasswordChange(event.currentTarget.value)}
-          disabled={disabled || isOpenNetwork}
-          placeholder={isOpenNetwork ? "Not required" : undefined}
-          autoComplete="new-password"
-        />
-      </div>
+      {isEnterprise && (
+        <>
+          <div className="grid gap-2">
+            <Label htmlFor="wifi-identity">Identity</Label>
+            <Input
+              id="wifi-identity"
+              value={identity}
+              onChange={(event) => onIdentityChange(event.currentTarget.value)}
+              disabled={disabled}
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="wifi-username">Username</Label>
+            <Input
+              id="wifi-username"
+              value={username}
+              onChange={(event) => onUsernameChange(event.currentTarget.value)}
+              disabled={disabled}
+              autoComplete="username"
+            />
+          </div>
+        </>
+      )}
+
+      {!isOpenNetwork && (
+        <div className="grid gap-2">
+          <Label htmlFor="wifi-password">Password</Label>
+          <Input
+            id="wifi-password"
+            type="password"
+            value={password}
+            onChange={(event) => onPasswordChange(event.currentTarget.value)}
+            disabled={disabled}
+            autoComplete="new-password"
+          />
+        </div>
+      )}
     </fieldset>
   );
 }
