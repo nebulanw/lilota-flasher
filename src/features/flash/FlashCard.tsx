@@ -111,6 +111,24 @@ export function FlashCard() {
                     disabled={controlsDisabled}
                   />
                   <Label htmlFor="erase-flash">Erase existing flash</Label>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          disabled={controlsDisabled}
+                          aria-label="About erasing existing flash"
+                        />
+                      }
+                    >
+                      <RiInformationLine />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Erases the entire device before flashing, including Lilota settings and files.
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 <div className="flex items-center gap-2">
