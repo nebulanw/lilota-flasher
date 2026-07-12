@@ -8,14 +8,22 @@ export default function App() {
     <SerialProvider>
       <main className="min-h-screen bg-background p-6 text-foreground">
         <div className="mx-auto flex flex-col gap-4">
-          <header className="flex items-center justify-between">
+          <header>
             <div>
-              <h1 className="font-heading text-2xl font-semibold">
-                Lilota
-              </h1>
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Lilota"
+                className="h-10 w-auto"
+              />
               <p className="text-sm">
-                Flasher for Lilota!
+                Lilota Flasher
               </p>
+              <a
+                href="../index.html"
+                className="mt-1 inline-block text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                &larr; Back to main site
+              </a>
             </div>
           </header>
           <div className="grid items-start gap-4 lg:grid-cols-2">

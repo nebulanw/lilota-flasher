@@ -1,4 +1,4 @@
-const DEFAULT_FIRMWARE_URL = "/lilota/lilota-webflash.bin";
+const DEFAULT_FIRMWARE_URL = `${import.meta.env.BASE_URL}/lilota/lilota-webflash.bin`;
 
 export async function loadDefaultFirmware(): Promise<Uint8Array> {
   const response = await fetch(DEFAULT_FIRMWARE_URL);

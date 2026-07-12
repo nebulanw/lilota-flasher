@@ -42,6 +42,7 @@ export function FlashCard() {
       (wifiAuthentication !== "wpa2-enterprise" ||
         (identity.trim().length > 0 && username.trim().length > 0)));
   const hasValidWifi = !configureWifi || (hasSsid && hasRequiredCredentials);
+  const isDisconnected = state === "disconnected";
   const serialReady = state === "ready" || state === "monitoring";
   const canFlash = serialReady && hasValidWifi && !isSubmitting;
   const controlsDisabled = !serialReady || isSubmitting;
@@ -90,7 +91,7 @@ export function FlashCard() {
       </CardHeader>
 
       <CardContent>
-        {!serialReady && (
+        {isDisconnected && (
           <p className="mb-4 text-sm text-muted-foreground">
             Connect a compatible device to configure and flash Lilota.
           </p>
@@ -99,7 +100,7 @@ export function FlashCard() {
         <form onSubmit={handleSubmit}>
           <fieldset
             disabled={controlsDisabled}
-            className="grid gap-6 disabled:opacity-50"
+            className={`grid gap-6 ${isDisconnected ? "opacity-50" : ""}`}
           >
             <div className="grid gap-6 xl:grid-cols-2">
               <div className="grid content-start gap-6">
@@ -209,7 +210,7 @@ export function FlashCard() {
               </Button>
 
               <Progress value={flashProgress} className="min-w-0 flex-1">
-                <ProgressLabel>Upload Progress</ProgressLabel>
+                <ProgressLabel>Flash progress</ProgressLabel>
                 <ProgressValue />
               </Progress>
             </div>
