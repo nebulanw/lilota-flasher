@@ -159,14 +159,14 @@ export function FlashCard() {
               </p>
             )}
 
-            <div className="grid gap-4">
+            <div className="flex items-end gap-4">
               <Button type="submit" disabled={!canFlash} className="w-fit">
                 <RiDownload2Line data-icon="inline-start" />
                 {isSubmitting ? "Flashing..." : "Flash"}
               </Button>
 
-              <Progress value={flashProgress} className="w-full max-w-sm">
-                <ProgressLabel>Upload Progess</ProgressLabel>
+              <Progress value={flashProgress} className="min-w-0 flex-1">
+                <ProgressLabel>Upload Progress</ProgressLabel>
                 <ProgressValue />
               </Progress>
             </div>
