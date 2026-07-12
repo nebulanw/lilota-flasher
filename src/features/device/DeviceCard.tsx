@@ -101,15 +101,15 @@ export function DeviceCard() {
         </Badge>
 
         {errorMessage && (
-          <p role="alert" className="text-xs text-destructive">
+          <p role="alert" className="text-sm text-destructive">
             {errorMessage}
           </p>
         )}
 
         {isConnected && deviceInfo && (
           <div className="grid gap-2">
-            <p className="text-sm font-medium">Device information</p>
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
+            <p className="text-base font-medium">Device information</p>
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
               <dt className="text-muted-foreground">Family</dt>
               <dd>{deviceInfo.family}</dd>
 

@@ -91,7 +91,7 @@ export function FlashCard() {
 
       <CardContent>
         {!serialReady && (
-          <p className="mb-4 text-xs text-muted-foreground">
+          <p className="mb-4 text-sm text-muted-foreground">
             Connect a compatible device to configure and flash Lilota.
           </p>
         )}
@@ -113,7 +113,7 @@ export function FlashCard() {
                       <SelectItem value="default">Default</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Additional builds will be available once automated releases are set up!
                   </p>
                 </div>
@@ -190,14 +190,14 @@ export function FlashCard() {
                   onAuthenticationChange={setWifiAuthentication}
                 />
               ) : (
-                <div className="flex min-h-24 items-center border border-dashed px-4 py-3 text-xs text-muted-foreground">
+                <div className="flex min-h-24 items-center border border-dashed px-4 py-3 text-sm text-muted-foreground">
                   Wi-Fi configuration is disabled. Lilota will start its own access point.
                 </div>
               )}
             </div>
 
             {errorMessage && (
-              <p role="alert" className="text-xs text-destructive">
+              <p role="alert" className="text-sm text-destructive">
                 {errorMessage}
               </p>
             )}
