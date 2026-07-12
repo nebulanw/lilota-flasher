@@ -93,9 +93,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
   const createEspToolSession = useCallback((port: SerialPort) => {
     return new EspToolSession(port, {
-      clean() {
-        terminalOutput.appendSeparator("Esptool output", "output");
-      },
+      clean() {},
       writeLine(text: string) {
         terminalOutput.appendStyled(`${text}\r\n`, "output");
       },
