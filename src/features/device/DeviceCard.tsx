@@ -23,13 +23,13 @@ const getConnectionStatus = (state: SerialState) => {
       return { label: "Connected", variant: "default" as const };
     
     case "monitoring":
-      return { label: "Connected - Monitoring", variant: "default" as const };
+      return { label: "Monitoring", variant: "default" as const };
     
     case "preparing-flash":
     case "bootloader":
     case "flashing":
     case "restoring-serial":
-      return { label: "Connected - Busy", variant: "default" as const };
+      return { label: "Busy", variant: "default" as const };
   }
 }
 
@@ -44,25 +44,22 @@ export function DeviceCard() {
 
   const connectionStatus = getConnectionStatus(state);
 
-  const handleConnect = async () => {
+  const handleConnectionToggle = async () => {
     setErrorMessage(null);
 
     try {
-      await connectPort();
+      if (isDisconnected) {
+        await connectPort();
+      } else {
+        await disconnectPort();
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     }
   };
 
-  const handleDisconnect = async () => {
-    setErrorMessage(null);
-
-    try {
-      await disconnectPort();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
-    }
-  };
+  const canToggleConnection = isDisconnected || canDisconnect;
+  const connectionButtonLabel = isDisconnected ? "Connect" : "Disconnect";
 
   return (
     <Card>
@@ -77,28 +74,24 @@ export function DeviceCard() {
           Make sure to use a good-quality USB data transfer cable!
         </p>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
           <Button
-            disabled={!isDisconnected}
-            onClick={() => void handleConnect()}
+            className="w-fit"
+            disabled={!canToggleConnection}
+            onClick={() => void handleConnectionToggle()}
           >
-            <RiUsbLine data-icon="inline-start" />
-            {isConnecting ? "Connecting..." : "Connect"}
+            {canDisconnect ? (
+              <RiLinkUnlinkM data-icon="inline-start" />
+            ) : (
+              <RiUsbLine data-icon="inline-start" />
+            )}
+            {connectionButtonLabel}
           </Button>
 
-          <Button
-            disabled={!canDisconnect}
-            onClick={() => void handleDisconnect()}
-          >
-            <RiLinkUnlinkM data-icon="inline-start" />
-            Disconnect
-          </Button>
+          <Badge variant={connectionStatus.variant}>
+            {connectionStatus.label}
+          </Badge>
         </div>
-
-        {/* NOTE: Does it make sense to change the color? */}
-        <Badge variant={connectionStatus.variant}>
-          State: {connectionStatus.label}
-        </Badge>
 
         {errorMessage && (
           <p role="alert" className="text-sm text-destructive">
