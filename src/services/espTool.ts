@@ -44,17 +44,11 @@ export class EspToolSession {
     const revision = chip.getChipRevision
       ? await chip.getChipRevision(this.loader)
       : undefined;
-    const features = await chip.getChipFeatures(this.loader);
-    const crystalFrequencyMhz = await chip.getCrystalFreq(this.loader);
-    const macAddress = await chip.readMac(this.loader);
 
     return {
       family: chip.CHIP_NAME,
       model,
       revision,
-      features,
-      crystalFrequencyMhz,
-      macAddress,
     };
   }
 

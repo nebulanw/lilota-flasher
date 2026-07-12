@@ -123,18 +123,6 @@ export function DeviceCard() {
                 </>
               )}
 
-              <dt className="text-muted-foreground">Crystal</dt>
-              <dd>{deviceInfo.crystalFrequencyMhz} MHz</dd>
-
-              <dt className="text-muted-foreground">MAC address</dt>
-              <dd className="font-mono">{deviceInfo.macAddress}</dd>
-
-              {deviceInfo.features.length > 0 && (
-                <>
-                  <dt className="text-muted-foreground">Features</dt>
-                  <dd>{deviceInfo.features.join(", ")}</dd>
-                </>
-              )}
             </dl>
           </div>
         )}
