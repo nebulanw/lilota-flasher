@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SerialState, SerialContext } from './SerialContext';
 import type { FlashRequest } from './types/flash';
 import { loadDefaultFirmware } from './services/firmware';
@@ -10,6 +10,7 @@ import {
   requestSerialPort,
   resetEsp32,
   SerialMonitor,
+  subscribeToSerialDisconnect,
   writeSerialData,
 } from './services/webSerial';
 import type { DeviceInfo } from './types/device';
@@ -32,6 +33,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
   const espToolSessionRef = useRef<EspToolSession | null>(null);
   const stateRef = useRef<SerialState>("disconnected");
   const serialMonitorRef = useRef<SerialMonitor | null>(null);
+  const removePortDisconnectListenerRef = useRef<(() => void) | null>(null);
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
@@ -79,6 +81,35 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     }
   }, [terminalOutput]);
 
+  const removePortDisconnectListener = useCallback(() => {
+    removePortDisconnectListenerRef.current?.();
+    removePortDisconnectListenerRef.current = null;
+  }, []);
+
+  const trackPhysicalDisconnect = useCallback((port: SerialPort) => {
+    removePortDisconnectListener();
+
+    removePortDisconnectListenerRef.current = subscribeToSerialDisconnect(
+      port,
+      () => {
+        if (portRef.current !== port) return;
+
+        removePortDisconnectListener();
+        portRef.current = null;
+        serialMonitorRef.current = null;
+        espToolSessionRef.current = null;
+        setDeviceInfo(null);
+        terminalOutput.cancelLineWaiters("USB device disconnected");
+        terminalOutput.appendSeparator("USB device disconnected", "warning");
+        setState("disconnected");
+      },
+    );
+  }, [removePortDisconnectListener, setState, terminalOutput]);
+
+  useEffect(() => {
+    return removePortDisconnectListener;
+  }, [removePortDisconnectListener]);
+
   const createEspToolSession = useCallback((port: SerialPort) => {
     return new EspToolSession(port, {
       clean() {
@@ -114,6 +145,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
       port = await requestSerialPort();
       portRef.current = port;
+      trackPhysicalDisconnect(port);
 
       setState("detecting");
       const espToolSession = createEspToolSession(port);
@@ -124,6 +156,11 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       espToolSessionRef.current = null;
 
       await openSerialPort(port);
+
+      if (portRef.current !== port) {
+        throw new Error("Device disconnected during detection");
+      }
+
       setDeviceInfo(detectedDevice);
       setState("ready");
     } catch (error) {
@@ -134,6 +171,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       }
 
       espToolSessionRef.current = null;
+      removePortDisconnectListener();
 
       if (port?.readable || port?.writable) {
         try {
@@ -148,7 +186,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       setState("disconnected");
       throw error;
     }
-  }, [createEspToolSession, setState]);
+  }, [createEspToolSession, removePortDisconnectListener, setState, trackPhysicalDisconnect]);
 
   const startSerialMonitor = useCallback(async () => {
     requireState("ready", "startSerialMonitor");
@@ -166,6 +204,8 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     void monitor.completed.then(
       () => undefined,
       (error) => {
+        if (portRef.current !== port) return;
+
         const message = error instanceof Error ? error.message : String(error);
         terminalOutput.appendSeparator(`Serial monitor failed: ${message}`, "error");
       },
@@ -203,6 +243,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
     const port = portRef.current;
     if (!port) {
+      removePortDisconnectListener();
       setDeviceInfo(null);
       setState("disconnected");
       return;
@@ -212,12 +253,15 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       await stopSerialMonitor();
     }
 
+    if (portRef.current !== port) return;
+
     await closeSerialPort(port);
+    removePortDisconnectListener();
     portRef.current = null;
     setDeviceInfo(null);
 
     setState("disconnected");
-  }, [setState, stopSerialMonitor]);
+  }, [removePortDisconnectListener, setState, stopSerialMonitor]);
 
   const releaseSerialPort = useCallback(async() => {
     requireState(["ready", "monitoring"], "releaseSerialPort");
@@ -288,7 +332,16 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       await espToolSession.resetAndDisconnect();
       espToolSessionRef.current = null;
 
+      if (portRef.current !== port) {
+        throw new Error("USB device disconnected during flashing");
+      }
+
       await openSerialPort(port);
+
+      if (portRef.current !== port) {
+        throw new Error("USB device disconnected while restoring serial");
+      }
+
       rawSerialRestored = true;
 
       setState("ready");
@@ -301,7 +354,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         await configureLilotaWifi(writeSerial, request.wifi);
       }
     } catch (err) {
-      if (!rawSerialRestored) {
+      if (!rawSerialRestored && portRef.current === port) {
         try {
           await espToolSessionRef.current?.disconnect();
         } catch (error) {
@@ -312,7 +365,12 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
         try {
           await openSerialPort(port);
-          setState("ready");
+
+          if (portRef.current === port) {
+            setState("ready");
+          } else if (port.readable || port.writable) {
+            await closeSerialPort(port);
+          }
         } catch (error) {
           console.warn("Failed to reopen serial port after flash fail", error);
           portRef.current = null;

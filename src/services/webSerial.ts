@@ -7,6 +7,16 @@ export async function requestSerialPort() {
   return navigator.serial.requestPort();
 }
 
+export function subscribeToSerialDisconnect(
+  port: SerialPort,
+  listener: () => void,
+) {
+  const handleDisconnect = () => listener();
+  port.addEventListener("disconnect", handleDisconnect);
+
+  return () => port.removeEventListener("disconnect", handleDisconnect);
+}
+
 export async function openSerialPort(port: SerialPort) {
   await port.open({ baudRate: SERIAL_BAUD_RATE });
 }

@@ -18,6 +18,7 @@ type LinePredicate = (line: string) => boolean;
 type LineWaiter = {
   predicate: LinePredicate;
   resolve: () => void;
+  reject: (error: Error) => void;
   timeoutId: ReturnType<typeof setTimeout>;
 };
 
@@ -80,6 +81,14 @@ export class TerminalOutput {
     this.currentLine = "";
   }
 
+  cancelLineWaiters(message: string) {
+    for (const waiter of this.lineWaiters) {
+      clearTimeout(waiter.timeoutId);
+      this.lineWaiters.delete(waiter);
+      waiter.reject(new Error(message));
+    }
+  }
+
   async waitForLine(
     predicate: LinePredicate,
     timeoutMs: number,
@@ -91,6 +100,7 @@ export class TerminalOutput {
       const waiter: LineWaiter = {
         predicate,
         resolve,
+        reject,
         timeoutId: setTimeout(() => {
           this.lineWaiters.delete(waiter);
           reject(new Error(timeoutMessage));

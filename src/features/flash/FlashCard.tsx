@@ -24,7 +24,7 @@ import { WifiFields } from "./WifiFields";
 
 export function FlashCard() {
   const { flashFirmware, flashProgress, state } = useSerial();
-  const [eraseFlash, setEraseFlash] = useState(true);
+  const [eraseFlash, setEraseFlash] = useState(false);
   const [configureWifi, setConfigureWifi] = useState(false);
   const [wifiSecurity, setWifiSecurity] = useState<WifiSecurity>("wpa2-personal");
   const [ssid, setSsid] = useState("");
