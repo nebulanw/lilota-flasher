@@ -3,16 +3,20 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
+import { formatTerminalSeparator } from "@/terminal/TerminalOutput";
 import { useSerial } from "@/useSerial";
 
 const MAX_PENDING_OUTPUT = 64_000;
 const WRITE_CHUNK_SIZE = 8_192;
 const OUTPUT_DROPPED_NOTICE =
-  "\r\n\x1b[33m── Terminal output dropped to keep the page responsive ──\x1b[0m\r\n";
+  formatTerminalSeparator(
+    "Terminal output dropped to keep the page responsive",
+    "warning",
+  );
 
 export function SerialTerminal() {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { state, subscribeTerminal, getTerminalBuffer, writeSerial } = useSerial();
+  const { state, subscribeTerminal, getTerminalReplay, writeSerial } = useSerial();
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -86,7 +90,7 @@ export function SerialTerminal() {
       pumpOutput();
     };
 
-    const existing = getTerminalBuffer();
+    const existing = getTerminalReplay();
     if (existing) enqueueOutput(existing);
 
     const unsubscribe = subscribeTerminal(enqueueOutput);
@@ -110,7 +114,7 @@ export function SerialTerminal() {
       resizeObserver.disconnect();
       term.dispose();
     };
-  }, [getTerminalBuffer, subscribeTerminal, writeSerial]);
+  }, [getTerminalReplay, subscribeTerminal, writeSerial]);
 
   return <div ref={containerRef} className="h-full" />;
 }

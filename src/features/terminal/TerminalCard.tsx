@@ -12,7 +12,7 @@ import { SerialTerminal } from "./SerialTerminal";
 
 export function TerminalCard() {
   const {
-    clearTerminalBuffer,
+    clearTerminal,
     resetToLilota,
     startSerialMonitor,
     state,
@@ -67,7 +67,7 @@ export function TerminalCard() {
             )}
           </Button>
 
-          <Button type="button" onClick={clearTerminalBuffer}>
+          <Button type="button" onClick={clearTerminal}>
             <RiDeleteBinLine data-icon="inline-start" />
             Clear
           </Button>

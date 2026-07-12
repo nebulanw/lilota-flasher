@@ -13,16 +13,7 @@ import {
   writeSerialData,
 } from './services/webSerial';
 import type { DeviceInfo } from './types/device';
-
-const MAX_TERMINAL_BUFFER_CHARS = 100_000;
-const MAX_TERMINAL_LINE_CHARS = 4_096;
-const MAX_TERMINAL_DELIVERY_CHARS = 64_000;
-const CLEAR_TERMINAL_SEQUENCE = "\x1b[2J\x1b[3J\x1b[H";
-const ANSI_RESET = "\x1b[0m";
-const ANSI_BLUE = "\x1b[38;5;75m";
-const ANSI_CYAN = "\x1b[36m";
-const ANSI_RED = "\x1b[31m";
-const ANSI_YELLOW = "\x1b[33m";
+import { TerminalOutput } from './terminal/TerminalOutput';
 
 const SERIAL_STATE_LABELS: Record<SerialState, string> = {
   disconnected: "Disconnected",
@@ -36,23 +27,16 @@ const SERIAL_STATE_LABELS: Record<SerialState, string> = {
   handoff: "Restoring serial",
 };
 
-function terminalSeparator(message: string, color = ANSI_BLUE) {
-  return `\r\n${color}── ${message} ──${ANSI_RESET}\r\n`;
-}
-
 export function SerialProvider({ children }: { children: React.ReactNode }) {
   const portRef = useRef<SerialPort>(null);
   const espToolSessionRef = useRef<EspToolSession | null>(null);
   const stateRef = useRef<SerialState>("disconnected");
-  const terminalListenerRef = useRef(new Set<(chunk: string) => void>());
-  const terminalBufferRef = useRef("");
   const serialMonitorRef = useRef<SerialMonitor | null>(null);
-  const latestTerminalLineRef = useRef("");
-  const promptWaitersRef = useRef(new Set<() => void>());
 
   const [state, _setState] = useState<SerialState>("disconnected" as SerialState);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [flashProgress, setFlashProgress] = useState(0);
+  const [terminalOutput] = useState(() => new TerminalOutput());
 
   function requireState(allowed: SerialState | SerialState[], action: string) {
     const list = Array.isArray(allowed) ? allowed: [allowed];
@@ -61,77 +45,27 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const appendTerminal = useCallback((chunk: string) => {
-    const retainedChunk = chunk.slice(-MAX_TERMINAL_BUFFER_CHARS);
-    terminalBufferRef.current =
-      (terminalBufferRef.current + retainedChunk).slice(-MAX_TERMINAL_BUFFER_CHARS);
-
-    const combinedLine =
-      (latestTerminalLineRef.current + retainedChunk).slice(-MAX_TERMINAL_LINE_CHARS);
-    const lastLineBreak = Math.max(
-      combinedLine.lastIndexOf("\r"),
-      combinedLine.lastIndexOf("\n")
-    );
-
-    latestTerminalLineRef.current =
-      lastLineBreak === -1 ? combinedLine : combinedLine.slice(lastLineBreak + 1);
-
-    if (isLilotaPrompt(latestTerminalLineRef.current)) {
-      for (const resolve of promptWaitersRef.current) {
-        resolve();
-      }
-
-      promptWaitersRef.current.clear();
-    }
-
-    const deliveredChunk = chunk.length > MAX_TERMINAL_DELIVERY_CHARS
-      ? terminalSeparator("Oversized terminal output truncated", ANSI_YELLOW) +
-        chunk.slice(-MAX_TERMINAL_DELIVERY_CHARS)
-      : chunk;
-
-    for (const listener of terminalListenerRef.current) {
-      listener(deliveredChunk);
-    }
-  }, []);
-
   const waitForLilotaPrompt = useCallback(async () => {
     requireState("monitoring", "waitForLilotaPrompt");
 
-    if (isLilotaPrompt(latestTerminalLineRef.current)) {
-      return;
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const resolveWaiter = () => {
-        window.clearTimeout(timeoutId);
-        resolve();
-      };
-
-      const timeoutId = window.setTimeout(() => {
-        promptWaitersRef.current.delete(resolveWaiter);
-        reject(new Error("Timed out waiting for Lilota prompt"));
-      }, 15_000);
-
-      promptWaitersRef.current.add(resolveWaiter);
-    })
-  }, []);
+    await terminalOutput.waitForLine(
+      isLilotaPrompt,
+      15_000,
+      "Timed out waiting for Lilota prompt",
+    );
+  }, [terminalOutput]);
 
   const subscribeTerminal = useCallback((listener: (chunk: string) => void) => {
-    terminalListenerRef.current.add(listener);
-    return () => {
-      terminalListenerRef.current.delete(listener);
-    };
-  }, []);
+    return terminalOutput.subscribe(listener);
+  }, [terminalOutput]);
 
-  const getTerminalBuffer = useCallback(() => {
-    return terminalBufferRef.current;
-  }, []);
+  const getTerminalReplay = useCallback(() => {
+    return terminalOutput.getReplayBuffer();
+  }, [terminalOutput]);
 
-  const clearTerminalBuffer = useCallback(() => {
-    terminalBufferRef.current = "";
-    latestTerminalLineRef.current = "";
-    appendTerminal(CLEAR_TERMINAL_SEQUENCE);
-  }, [appendTerminal]);
+  const clearTerminal = useCallback(() => {
+    terminalOutput.clear();
+  }, [terminalOutput]);
 
   const setState = useCallback((next: SerialState) => {
     const prev = stateRef.current;
@@ -139,25 +73,25 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     _setState(next);
 
     if (prev !== next) {
-      appendTerminal(terminalSeparator(
+      terminalOutput.appendSeparator(
         `${SERIAL_STATE_LABELS[prev]} → ${SERIAL_STATE_LABELS[next]}`
-      ));
+      );
     }
-  }, [appendTerminal]);
+  }, [terminalOutput]);
 
   const createEspToolSession = useCallback((port: SerialPort) => {
     return new EspToolSession(port, {
       clean() {
-        appendTerminal(terminalSeparator("Esptool output", ANSI_CYAN));
+        terminalOutput.appendSeparator("Esptool output", "output");
       },
       writeLine(text: string) {
-        appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}\r\n`);
+        terminalOutput.appendStyled(`${text}\r\n`, "output");
       },
       write(text: string) {
-        appendTerminal(`${ANSI_CYAN}${text}${ANSI_RESET}`);
+        terminalOutput.appendStyled(text, "output");
       },
     });
-  }, [appendTerminal]);
+  }, [terminalOutput]);
 
   const resetToLilota = useCallback(async() => {
     requireState(["ready", "monitoring"], "resetToLilota");
@@ -225,7 +159,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       throw new Error("No port connected");
     }
 
-    const monitor = new SerialMonitor(port, appendTerminal);
+    const monitor = new SerialMonitor(port, (chunk) => terminalOutput.append(chunk));
     serialMonitorRef.current = monitor;
     setState("monitoring");
 
@@ -233,7 +167,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       () => undefined,
       (error) => {
         const message = error instanceof Error ? error.message : String(error);
-        appendTerminal(terminalSeparator(`Serial monitor failed: ${message}`, ANSI_RED));
+        terminalOutput.appendSeparator(`Serial monitor failed: ${message}`, "error");
       },
     ).finally(() => {
       if (serialMonitorRef.current === monitor) {
@@ -244,7 +178,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
         setState("ready");
       }
     });
-  }, [appendTerminal, setState]);
+  }, [setState, terminalOutput]);
 
   const writeSerial = useCallback(async (data: string) => {
     requireState("monitoring", "writeSerial");
@@ -358,7 +292,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       rawSerialRestored = true;
 
       setState("ready");
-      latestTerminalLineRef.current = "";
+      terminalOutput.resetCurrentLine();
       await resetToLilota();
       await startSerialMonitor();
 
@@ -389,7 +323,7 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
 
       throw err;
     }
-  }, [createEspToolSession, releaseSerialPort, resetToLilota, setState, startSerialMonitor, waitForLilotaPrompt, writeSerial]);
+  }, [createEspToolSession, releaseSerialPort, resetToLilota, setState, startSerialMonitor, terminalOutput, waitForLilotaPrompt, writeSerial]);
 
   return (
     <SerialContext.Provider value={{
@@ -402,8 +336,8 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
       flashFirmware: flashLilota,
       resetToLilota,
       subscribeTerminal,
-      getTerminalBuffer,
-      clearTerminalBuffer,
+      getTerminalReplay,
+      clearTerminal,
       writeSerial,
       state
     }}>

@@ -24,8 +24,8 @@ export type SerialContextValue = {
   flashFirmware: (request: FlashRequest) => Promise<void>;
   resetToLilota: () => Promise<void>;
   subscribeTerminal: (listener: (chunk: string) => void) => () => void;
-  getTerminalBuffer: () => string;
-  clearTerminalBuffer: () => void;
+  getTerminalReplay: () => string;
+  clearTerminal: () => void;
   writeSerial: (data: string) => Promise<void>;
 }
 
