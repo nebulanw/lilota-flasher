@@ -86,88 +86,90 @@ export function FlashCard() {
             disabled={controlsDisabled}
             className="grid gap-6 disabled:opacity-50"
           >
-          <div className="grid gap-2">
-            <Label htmlFor="lilota-build">Lilota build</Label>
-            <Select value="default" disabled>
-              <SelectTrigger id="lilota-build" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Default</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Additional builds will be available once automated releases are set up!
-            </p>
-          </div>
+            <div className="grid gap-6 xl:grid-cols-2">
+              <div className="grid content-start gap-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="lilota-build">Lilota build</Label>
+                  <Select value="default" disabled>
+                    <SelectTrigger id="lilota-build" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default">Default</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Additional builds will be available once automated releases are set up!
+                  </p>
+                </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              id="erase-flash"
-              checked={eraseFlash}
-              onCheckedChange={(checked) => setEraseFlash(checked === true)}
-              disabled={controlsDisabled}
-            />
-            <Label htmlFor="erase-flash">Erase existing flash</Label>
-          </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="erase-flash"
+                    checked={eraseFlash}
+                    onCheckedChange={(checked) => setEraseFlash(checked === true)}
+                    disabled={controlsDisabled}
+                  />
+                  <Label htmlFor="erase-flash">Erase existing flash</Label>
+                </div>
 
-          <div className="grid gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="configure-wifi"
-                checked={configureWifi}
-                onCheckedChange={(checked) => setConfigureWifi(checked === true)}
-                disabled={controlsDisabled}
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="configure-wifi"
+                    checked={configureWifi}
+                    onCheckedChange={(checked) => setConfigureWifi(checked === true)}
+                    disabled={controlsDisabled}
+                  />
+                  <Label htmlFor="configure-wifi">Configure Wi-Fi</Label>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          disabled={controlsDisabled}
+                          aria-label="About Wi-Fi configuration"
+                        />
+                      }
+                    >
+                      <RiInformationLine />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      If Wi-Fi configuration is disabled, Lilota will start its own access point.
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+
+              <WifiFields
+                disabled={!configureWifi || controlsDisabled}
+                ssid={ssid}
+                password={password}
+                security={wifiSecurity}
+                onSsidChange={setSsid}
+                onPasswordChange={setPassword}
+                onSecurityChange={setWifiSecurity}
               />
-              <Label htmlFor="configure-wifi">Configure Wi-Fi</Label>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      disabled={controlsDisabled}
-                      aria-label="About Wi-Fi configuration"
-                    />
-                  }
-                >
-                  <RiInformationLine />
-                </TooltipTrigger>
-                <TooltipContent>
-                  If Wi-Fi configuration is disabled, Lilota will start its own access point.
-                </TooltipContent>
-              </Tooltip>
             </div>
 
-            <WifiFields
-              disabled={!configureWifi || controlsDisabled}
-              ssid={ssid}
-              password={password}
-              security={wifiSecurity}
-              onSsidChange={setSsid}
-              onPasswordChange={setPassword}
-              onSecurityChange={setWifiSecurity}
-            />
-          </div>
+            {errorMessage && (
+              <p role="alert" className="text-xs text-destructive">
+                {errorMessage}
+              </p>
+            )}
 
-          {errorMessage && (
-            <p role="alert" className="text-xs text-destructive">
-              {errorMessage}
-            </p>
-          )}
+            <div className="grid gap-4">
+              <Button type="submit" disabled={!canFlash} className="w-fit">
+                <RiDownload2Line data-icon="inline-start" />
+                {isSubmitting ? "Flashing..." : "Flash"}
+              </Button>
 
-          <div className="grid gap-4">
-            <Button type="submit" disabled={!canFlash} className="w-fit">
-              <RiDownload2Line data-icon="inline-start" />
-              {isSubmitting ? "Flashing..." : "Flash"}
-            </Button>
-
-            <Progress value={flashProgress} className="w-full max-w-sm">
-              <ProgressLabel>Upload Progess</ProgressLabel>
-              <ProgressValue />
-            </Progress>
-          </div>
+              <Progress value={flashProgress} className="w-full max-w-sm">
+                <ProgressLabel>Upload Progess</ProgressLabel>
+                <ProgressValue />
+              </Progress>
+            </div>
           </fieldset>
         </form>
       </CardContent>

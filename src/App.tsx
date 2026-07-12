@@ -18,14 +18,10 @@ export default function App() {
               </p>
             </div>
           </header>
-          <div className="grid gap-4 ">
-            {/* <WorkflowPanel /> */}
-            <div className="flex flex-col gap-4">
-              <DeviceCard />
-              <FlashCard />
-            </div>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <DeviceCard />
+            <FlashCard />
           </div>
-          {/* <BoardLabel></BoardLabel> */}
           <TerminalCard />
         </div>
       </main>
