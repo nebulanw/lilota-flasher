@@ -91,6 +91,18 @@ export function SerialProvider({ children }: { children: React.ReactNode }) {
     return removePortDisconnectListener;
   }, [removePortDisconnectListener]);
 
+  useEffect(() => {
+    if (state === "disconnected" || state === "connecting") return;
+
+    const preventUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", preventUnload);
+    return () => window.removeEventListener("beforeunload", preventUnload);
+  }, [state]);
+
   const createEspToolSession = useCallback((port: SerialPort) => {
     return new EspToolSession(port, {
       clean() {},
